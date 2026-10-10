@@ -147,7 +147,7 @@ export default function CowrieApp() {
   }, [addr, configured]);
   useEffect(() => { refresh(); const t = setInterval(refresh, 4000); return () => clearInterval(t); }, [refresh]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy]);
-  useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }, [input]);
+  useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);
   useEffect(() => { if (authenticated && configured && !greeted.current) { greeted.current = true; const h = new Date().getHours(); const tod = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; setThread((t) => (t.length ? t : [{ who: "cowrie", text: pick([`${tod}, ${firstName}. Your money's ready, tell me what to do, or tap a suggestion.`, `${tod}, ${firstName}. What should we do with your money today?`]) }])); } }, [authenticated, configured, firstName]);
   useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
@@ -344,7 +344,7 @@ export default function CowrieApp() {
             </div>
             <div className="composer">
               <textarea ref={taRef} value={input} rows={1} placeholder="Tell Cowrie what to do…" onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handle(); } }} />
-              <button className="send" onClick={() => handle()} disabled={busy}>{busy ? "…" : "Send"}</button>
+              <button className="send" onClick={() => handle()} disabled={busy} aria-label="Send" title="Send"><Icon size={20}><path d="M22 2 11 13" /><path d="M22 2 15 22 11 13 2 9 22 2Z" /></Icon></button>
             </div>
           </>
         )}

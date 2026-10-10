@@ -64,9 +64,9 @@ body { background:var(--bg-grad); background-attachment:fixed; color:var(--text)
 @keyframes rise { from{opacity:0;transform:translateY(5px);} to{opacity:1;transform:none;} }
 @media (prefers-reduced-motion:reduce){ .wallet,.wallet::after,.bubble.cowrie{animation:none!important;} }
 .composer { position:sticky; bottom:94px; display:flex; align-items:flex-end; gap:8px; padding:10px 0; background:linear-gradient(to top,var(--bg) 72%,transparent); }
-.composer textarea { flex:1; padding:14px 17px; border-radius:15px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:15px; line-height:1.4; font-family:inherit; outline:none; resize:none; max-height:140px; overflow-y:auto; display:block; }
+.composer textarea { flex:1; padding:14px 17px; border-radius:15px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:15px; line-height:1.4; font-family:inherit; outline:none; resize:none; max-height:140px; overflow-y:hidden; display:block; }
 .composer textarea:focus { border-color:var(--brand); box-shadow:0 0 0 3px rgba(123,92,255,.15); }
-.send { align-self:flex-end; height:51px; background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#fff; border:0; border-radius:15px; padding:0 22px; font-weight:600; font-size:15px; font-family:inherit; cursor:pointer; }
+.send { align-self:flex-end; flex:none; width:51px; height:51px; display:grid; place-items:center; background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#fff; border:0; border-radius:15px; padding:0; cursor:pointer; box-shadow:0 10px 22px -12px rgba(74,55,214,.7); }
 .dapps { display:flex; flex-direction:column; gap:8px; align-self:flex-start; max-width:92%; margin-top:2px; }
 .dapp { display:flex; flex-direction:column; gap:3px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:11px 14px; text-decoration:none; color:var(--text); transition:transform .12s,border-color .12s; box-shadow:0 6px 16px -14px rgba(20,16,50,.5); }
 .dapp:hover { border-color:var(--brand); transform:translateY(-1px); }
