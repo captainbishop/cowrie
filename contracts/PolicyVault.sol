@@ -35,6 +35,10 @@ contract PolicyVault is ReentrancyGuard {
 
     mapping(address => mapping(address => Allowance)) public allowances; // from => to
 
+    uint16 public constant EARN_APR_BPS = 1000; // 10.00% a year, a demo rate on testnet
+    mapping(address => uint256) public earnPrincipal; // balance moved into the earn vault
+    mapping(address => uint256) public earnSince; // timestamp of the last accrual
+
     event Deposited(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event Sent(address indexed from, address indexed to, uint256 amount, uint256 autoSaved);
@@ -43,6 +47,9 @@ contract PolicyVault is ReentrancyGuard {
     event RuleChanged(address indexed user, string rule);
     event AllowanceSet(address indexed from, address indexed to, uint256 ratePerDay);
     event AllowanceClaimed(address indexed from, address indexed to, uint256 amount);
+    event EarnStarted(address indexed user, uint256 amount);
+    event EarnStopped(address indexed user, uint256 amount);
+    event YieldPaid(address indexed user, uint256 amount);
 
     constructor(IMintableUSD _token, IScamRegistry _scam) {
         token = _token;
@@ -145,6 +152,60 @@ contract PolicyVault is ReentrancyGuard {
         spendable[from] -= pay;
         _credit(msg.sender, pay);
         emit AllowanceClaimed(from, msg.sender, pay);
+    }
+
+    // ---------- earn: a yield-bearing savings vault ----------
+    /// @notice Move spendable into the earn vault, where it grows at EARN_APR_BPS a year.
+    function startEarning(uint256 amount) external nonReentrant {
+        require(amount > 0, "zero");
+        _accrueEarn(msg.sender);
+        require(spendable[msg.sender] >= amount, "insufficient");
+        spendable[msg.sender] -= amount;
+        earnPrincipal[msg.sender] += amount;
+        emit EarnStarted(msg.sender, amount);
+    }
+
+    /// @notice Move part of your earning balance back to spendable (accrues yield first).
+    function stopEarning(uint256 amount) external nonReentrant {
+        _accrueEarn(msg.sender);
+        require(amount > 0 && earnPrincipal[msg.sender] >= amount, "insufficient earning");
+        earnPrincipal[msg.sender] -= amount;
+        spendable[msg.sender] += amount;
+        emit EarnStopped(msg.sender, amount);
+    }
+
+    /// @notice Move your whole earning balance, with the yield earned, back to spendable.
+    function stopAllEarning() external nonReentrant {
+        _accrueEarn(msg.sender);
+        uint256 p = earnPrincipal[msg.sender];
+        require(p > 0, "nothing earning");
+        earnPrincipal[msg.sender] = 0;
+        spendable[msg.sender] += p;
+        emit EarnStopped(msg.sender, p);
+    }
+
+    /// @notice Fold accrued yield into principal and mint it so the vault can pay it out.
+    function _accrueEarn(address user) internal {
+        uint256 p = earnPrincipal[user];
+        uint256 since = earnSince[user];
+        if (p > 0 && since != 0 && block.timestamp > since) {
+            uint256 earned = (p * EARN_APR_BPS * (block.timestamp - since)) / (10000 * 365 days);
+            if (earned > 0) {
+                token.mint(address(this), earned);
+                earnPrincipal[user] = p + earned;
+                emit YieldPaid(user, earned);
+            }
+        }
+        earnSince[user] = block.timestamp;
+    }
+
+    /// @notice Your earning balance including yield accrued since the last update.
+    function earnedOf(address user) external view returns (uint256) {
+        uint256 p = earnPrincipal[user];
+        uint256 since = earnSince[user];
+        if (p == 0 || since == 0 || block.timestamp <= since) return p;
+        uint256 earned = (p * EARN_APR_BPS * (block.timestamp - since)) / (10000 * 365 days);
+        return p + earned;
     }
 
     // ---------- views ----------

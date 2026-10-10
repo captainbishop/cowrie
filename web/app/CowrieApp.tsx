@@ -58,6 +58,7 @@ const DAPPS: Record<string, { intro: string; apps: DApp[] }> = {
     ],
   },
 };
+const CHIP_POOL = ["Send ₦5,000 to a friend", "Save 10% of what I receive", "Grow my savings", "What's my balance?", "Cap my spending at ₦20,000 a day", "Give my son ₦2,000 a day", "Remind me before Netflix renews", "Pay ₦7,500 to a seller", "Where can I earn yield?"];
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
 const EXPLORER = monadTestnet.blockExplorers?.default.url || "https://testnet.monadexplorer.com";
 
@@ -102,6 +103,8 @@ export default function CowrieApp() {
   const [subs, setSubs] = useState<Sub[]>([]);
   const [facts, setFacts] = useState<string[]>([]);
   const [tab, setTab] = useState("home");
+  const [starters, setStarters] = useState<string[]>([]);
+  const [earned, setEarned] = useState<bigint>(0n);
   const [addAmt, setAddAmt] = useState(50000);
   const [book, setBook] = useState<{ name: string; address: `0x${string}` }[]>([]);
   const [cName, setCName] = useState("");
@@ -143,11 +146,13 @@ export default function CowrieApp() {
         publicClient.getBalance({ address: addr }),
       ]);
       setSpendable(sp as bigint); setSavings(sv as bigint); setGas(g as bigint);
+      try { const en = await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "earnedOf", args: [addr] }); setEarned(en as bigint); } catch { setEarned(0n); }
     } catch {}
   }, [addr, configured]);
   useEffect(() => { refresh(); const t = setInterval(refresh, 4000); return () => clearInterval(t); }, [refresh]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy]);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);
+  useEffect(() => { const p = [...CHIP_POOL]; for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } setStarters(p.slice(0, 3)); }, []);
   useEffect(() => { if (authenticated && configured && !greeted.current) { greeted.current = true; const h = new Date().getHours(); const tod = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; setThread((t) => (t.length ? t : [{ who: "cowrie", text: pick([`${tod}, ${firstName}. Your money's ready, tell me what to do, or tap a suggestion.`, `${tod}, ${firstName}. What should we do with your money today?`]) }])); } }, [authenticated, configured, firstName]);
   useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
@@ -237,6 +242,13 @@ export default function CowrieApp() {
     catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
     finally { setBusy(false); }
   }
+  async function withdrawEarnings() {
+    if (busy || earned <= 0n) return;
+    setBusy(true);
+    try { const h = await run("stopAllEarning", [], { description: "Move your earnings back to spendable.", successHeader: "Withdrawn", title: "Earn" }); logTx({ hash: h, title: "Withdrew earnings", amount: cfmt(earned), sign: "pos" }); say({ who: "cowrie", tone: "good", text: `Moved your earnings back to spendable, ${firstName}.` }); await refresh(); }
+    catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
+    finally { setBusy(false); }
+  }
   async function handle(override?: string) {
     const text = (typeof override === "string" ? override : input).trim();
     if (!text || busy) return;
@@ -251,6 +263,8 @@ export default function CowrieApp() {
       const amt = (n: number) => amtStr(n, c);
       if (it.action === "reply") { if (it.remember) remember(it.remember); say({ who: "cowrie", text: it.message || it.text || it.reply || "Okay.", options: Array.isArray(it.options) ? it.options.slice(0, 4) : undefined }); }
       else if (it.action === "discover") { const cat = ["earn", "predict", "trade"].includes(it.category) ? it.category : "earn"; const d = DAPPS[cat]; say({ who: "cowrie", text: d.intro, links: d.apps }); }
+      else if (it.action === "earn") { const units = toUnits(it.amount || 0, c); if (!it.amount || units <= 0n) { say({ who: "cowrie", text: `How much would you like to move into earning, ${firstName}?`, options: ["Earn ₦10,000", "Earn ₦50,000", "Earn ₦100,000", "Another amount"] }); } else if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} spendable right now, ${firstName}. Pick an amount up to that and I'll move it into your Earn vault.` }); } else { const h = await run("startEarning", [units], { description: `Move ${amt(it.amount)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. ${amt(it.amount)} is in your Cowrie Earn vault now, growing at 10% a year. Pull it out anytime with the Withdraw button on the home screen.` }); } }
+      else if (it.action === "stopEarn") { if (earned <= 0n) { say({ who: "cowrie", text: `You don't have anything earning right now, ${firstName}.` }); } else { const h = await run("stopAllEarning", [], { description: "Move your earnings back to spendable.", successHeader: "Withdrawn", title: "Earn" }); logTx({ hash: h, title: "Withdrew earnings", amount: cfmt(earned), sign: "pos" }); say({ who: "cowrie", tone: "good", text: `Moved your earnings back to spendable, ${firstName}, principal and the yield it made.` }); } }
       else if (it.action === "balance") { say({ who: "cowrie", text: `${firstName}, you've got ${cfmt(spendable)} to spend${savings > 0n ? `, with ${cfmt(savings)} tucked away in savings` : ""}. ${gas === 0n ? "Your wallet needs a little MON for gas before you can move it." : `You've ${Number(formatEther(gas)).toFixed(3)} MON left for gas.`}` }); }
       else if (it.action === "addSubscription") { const s = addSub(it.service || "Subscription", it.amount || 0, it.currency, it.cycleDays, it.startedDaysAgo); const d = Math.ceil((new Date(s.nextISO).getTime() - Date.now()) / 86400000); say({ who: "cowrie", tone: "good", text: `Got it, ${firstName}, I'm now tracking your ${s.service}${s.amount ? ` at ${amtStr(s.amount, s.currency)}` : ""}. ${d <= 0 ? "It's due now" : `Next renewal in ${d} day${d === 1 ? "" : "s"}`}. I'll nudge you to renew or cancel, tap the bell up top.` }); }
       else if (it.action === "setAutosave") { const h = await run("setAutosave", [Math.round(it.percent * 100)], { description: `Save ${it.percent}% of everything you receive, automatically.`, successHeader: "Rule set", title: "Auto-save" }); logTx({ hash: h, title: `Auto-save ${it.percent}%`, amount: "rule", sign: "" }); say({ who: "cowrie", tone: "good", text: pick([`Done, ${firstName},${it.percent}% of everything you receive now slips into your savings pot automatically.`, `Rule set: whenever money lands, ${it.percent}% goes straight to savings. You won't have to think about it.`]) }); }
@@ -325,10 +339,11 @@ export default function CowrieApp() {
             {brand && (<button className="scenebanner" style={{ color: brand.color, borderColor: brand.color }} onClick={() => setBrand(null)}><span className="cdot" style={{ background: brand.color }} /><span>{brand.label}, want this as a monthly plan?</span></button>)}
             {low && !brand && (<button className="lownote" onClick={() => setTab("add")}>You&rsquo;re running low, tap to top up.</button>)}
             {alertCount > 0 && (<button className="remind" onClick={() => setTab("alerts")}><span className="cdot" style={{ background: "var(--brass)" }} /><span>{dueSubs[0].s.service} {dueSubs[0].days <= 0 ? "is due now" : `${dueSubs[0].s.cycleDays > 0 ? "renews" : "due"} in ${dueSubs[0].days} day${dueSubs[0].days === 1 ? "" : "s"}`}, tap to review</span></button>)}
+            {earned > 0n && (<div className="earnstrip"><div className="ei"><b>Earning {mask(cfmt(earned))}</b><small>Cowrie vault · 10% a year</small></div><button className="earnw" onClick={withdrawEarnings} disabled={busy}>Withdraw</button></div>)}
             {!configured && <p className="hint">Add your contract addresses to web/.env.local and restart.</p>}
             {gas === 0n && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
             <div className="chips">
-              {["Save 10% of what I receive", "Send ₦5,000 to a friend", "Pay ₦7,500 to a seller", "Give my son ₦2,000 a day", "Grow my savings"].map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
+              {starters.map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
             </div>
             <div className="thread">
               {thread.length === 0 && <p className="empty">Tell Cowrie what to do, in your own words. Try &ldquo;save 10% of everything I receive&rdquo;.</p>}

@@ -33,6 +33,13 @@ async function main() {
   };
   fs.writeFileSync("deployments.json", JSON.stringify(out, null, 2));
   console.log("\nSaved deployments.json");
+
+  try {
+    require("./syncenv").syncEnv();
+  } catch (e) {
+    console.warn("Could not auto-update web/.env.local:", e.message);
+    console.warn("You can run it yourself with: npm run syncenv");
+  }
 }
 
 main().catch((e) => {

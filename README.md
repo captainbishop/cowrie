@@ -13,21 +13,25 @@
 
 # Cowrie
 
-Talk to your money. Cowrie is a stablecoin wallet on Monad where you say what you want in plain language and it happens: send money, save a share of what you receive, cap your daily spending, give someone a daily allowance, check your balance, track subscriptions so you get reminded before each renewal, and find DeFi apps when you want to earn, trade, or predict. Every payment is checked against a scam-address list before it leaves your wallet.
+Most people never touch crypto, and the wallets are the reason. There is a seed phrase to lose, a gas token you must buy before you can move a single cent, and a 42-character address to paste where one wrong letter hands your money to a stranger you will never get it back from. And even a normal bank app only shows you the damage after the fact. It won't stop you overspending, save on your behalf, or warn you before a subscription bills again.
 
-When an AI key is connected the assistant understands free-form requests, including Nigerian Pidgin. It remembers what you tell it and the rest of the conversation, answers questions about your balance from the live chain, and offers tap-to-pick options when a choice saves you typing. Without a key it falls back to a built-in parser so the app still works.
+Cowrie is a stablecoin wallet you talk to. You say what you want, in plain English or Nigerian Pidgin, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay someone a daily allowance, grow your balance in a savings vault, or track a subscription. Every payment is checked against a scam list before it leaves your wallet. You sign in with Google, so there is no seed phrase, the fees are too small to notice, and every amount shows in your own currency.
+
+It runs on Monad, where everything settles in well under a second. Fast enough that saying a thing and watching it happen feel like the same moment.
 
 ## What it does
 
-- Send money by saved name or wallet address, with a scam check before every payment.
-- Save a set percentage of everything you receive, automatically.
-- Cap how much you can spend in a day.
-- Give someone a daily allowance that tops itself up.
-- Track subscriptions and bills, with a reminder before each one is due to pay or cancel.
-- Ask what your balance is and get the real figure, read straight from the chain.
-- Find DeFi apps for earning yield, trading, or prediction markets, and open them to connect your own wallet. Cowrie never moves your money for you.
-- Talk to an assistant that remembers you, replies in your language, and shows a screen that warms when your balance runs low.
-- Sign in with Google through Privy, no seed phrase, with amounts shown in your own currency.
+Talk to it the way you would text a friend who handles money for you:
+
+- "Send ₦5,000 to Mum." It pays her by name, after checking the address against a scam list.
+- "Save 10% of everything I receive." A tenth of every payment slips into savings on its own.
+- "Don't let me spend more than ₦20,000 a day." The cap holds on-chain, not on the honour system.
+- "Give my son ₦2,000 a day." A streaming allowance that tops itself up while you sleep.
+- "Grow my savings." Your money moves into Cowrie's vault and earns yield, and you pull it out whenever.
+- "Remind me before Netflix renews." It tracks your subscriptions and nudges you to pay or cancel in time.
+- "What's my balance?" The real number, read straight off the chain, never a guess.
+
+When an AI key is connected it understands free-form requests, remembers what you have told it and the rest of the conversation, and answers in your language, Pidgin included. Without one it falls back to a built-in parser, so the app still works. The screen responds as you go too, warming when your balance runs low and taking a brand's colour when you mention one.
 
 ## At a glance
 
@@ -37,7 +41,8 @@ When an AI key is connected the assistant understands free-form requests, includ
 | Contracts | PolicyVault, ScamRegistry, MockUSD |
 | App | Next.js, Privy, viem |
 | Assistant | any OpenAI-compatible model, Gemini by default, with a no-key fallback |
-| DeFi links | Kintsu, Aave, Kuru, Polymarket, and the Monad app directory |
+| Earn | Cowrie savings vault, on-chain, withdraw anytime |
+| Trade and predict | links to Kuru, Polymarket, and the Monad app directory |
 | Currencies shown | NGN, USD, GHS, KES, ZAR, GBP, EUR, INR |
 
 ## How it works
@@ -46,9 +51,10 @@ When an AI key is connected the assistant understands free-form requests, includ
 
 ## Earning, trading, and predicting
 
-Cowrie keeps your money in your own wallet and never deposits it into an outside protocol for you. When you ask about earning, trading, or predicting, it suggests apps that do that job and opens them in a new tab for you to connect your wallet yourself:
+Earning is built in. Say "grow my savings" or "earn 50,000" and Cowrie moves that amount from your spendable into its own on-chain savings vault, where it grows at a set rate and you can withdraw anytime. On testnet the yield is simulated and funded by the faucet mint; a production version would route to a real yield source.
 
-- Earn yield: Kintsu, for liquid staking on Monad, and Aave, for lending.
+Trading and prediction markets happen in apps built for them, so Cowrie points you to one and opens it in a new tab for you to connect your own wallet:
+
 - Trade: Kuru, an on-chain order-book exchange on Monad.
 - Predict: Polymarket, for backing real-world outcomes.
 
@@ -71,7 +77,7 @@ npm run deploy
 npm run seed
 ```
 
-`deploy` writes the three addresses to `deployments.json`. `seed` mints you some test cUSD, flags a demo scam address, and turns on a 10% auto-save rule.
+`deploy` writes the three addresses to `deployments.json` and fills them into `web/.env.local` for you. `seed` mints you some test cUSD, flags a demo scam address, and turns on a 10% auto-save rule.
 
 ## Run the app
 
@@ -80,7 +86,7 @@ cd web
 copy .env.local.example .env.local
 ```
 
-Put your Privy app id (https://dashboard.privy.io), the three addresses from `deployments.json`, and an optional AI key (any OpenAI-compatible endpoint) into `.env.local`, then:
+The contract addresses are already in `.env.local` from the deploy step. Add your Privy app id (https://dashboard.privy.io) and an optional AI key (any OpenAI-compatible endpoint), then:
 
 ```bat
 npm install
@@ -91,9 +97,9 @@ Open http://localhost:3000.
 
 ## Deployed on Monad testnet
 
-- PolicyVault: `0x63A4A7Df86B7E9E76Cf4488ACB5bc5131262FBF7`
-- ScamRegistry: `0xed9e8390200a6d12c3780E9a36a292c1c9d194Dd`
-- MockUSD (cUSD): `0xecB5a014cdD0a79637E70001314851300fCa3cAC`
+- PolicyVault: `0x213498cED496053683626F1928Db992bA770F633`
+- ScamRegistry: `0xB50776D03C92789b61A048fb7dA5B02fC0E3f7f7`
+- MockUSD (cUSD): `0x5C191aC746aD6cE5fb9357e000057Fe9087B7a03`
 
 Explorer https://testnet.monadexplorer.com, RPC https://testnet-rpc.monad.xyz, faucet https://faucet.monad.xyz.
 
