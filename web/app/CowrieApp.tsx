@@ -33,10 +33,35 @@ const BRANDS = [
   { k: /twitter|x premium/i, label: "X", color: "#111827" },
 ] as { k: RegExp; label: string; color: string }[];
 function detectBrand(t: string) { for (const b of BRANDS) if (b.k.test(t)) return { label: b.label, color: b.color }; return null; }
+type DApp = { label: string; desc: string; url: string; tag: string };
+const DAPPS: Record<string, { intro: string; apps: DApp[] }> = {
+  earn: {
+    intro: "Here are real places to put your stablecoins to work and earn yield. Each opens in a new tab and you connect your own wallet there, Cowrie never moves your money for you.",
+    apps: [
+      { label: "Kintsu", desc: "Liquid staking on Monad, earn while your stake stays liquid.", url: "https://kintsu.xyz", tag: "Monad" },
+      { label: "Aave", desc: "Lend out your stablecoins and earn interest on them.", url: "https://app.aave.com", tag: "multi-chain" },
+      { label: "More on Monad", desc: "Browse every live app in the Monad ecosystem.", url: "https://www.monad.xyz", tag: "directory" },
+    ],
+  },
+  predict: {
+    intro: "Prediction markets let you back your view on real-world events. Each opens in a new tab and you connect your own wallet, Cowrie doesn't place anything for you.",
+    apps: [
+      { label: "Polymarket", desc: "Trade on elections, sports, prices and world events.", url: "https://polymarket.com", tag: "external" },
+      { label: "More on Monad", desc: "Browse prediction and trading apps on Monad.", url: "https://www.monad.xyz", tag: "directory" },
+    ],
+  },
+  trade: {
+    intro: "Want to swap or trade tokens? These open in a new tab and you trade from your own wallet, Cowrie never trades for you.",
+    apps: [
+      { label: "Kuru", desc: "Fully on-chain order-book DEX, built on Monad.", url: "https://www.kuru.io", tag: "Monad" },
+      { label: "More on Monad", desc: "Browse every DEX and app on Monad.", url: "https://www.monad.xyz", tag: "directory" },
+    ],
+  },
+};
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
 const EXPLORER = monadTestnet.blockExplorers?.default.url || "https://testnet.monadexplorer.com";
 
-type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[] };
+type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[]; links?: DApp[] };
 type Tx = { hash: string; title: string; amount: string; sign: "pos" | "neg" | ""; ts: number };
 type Sub = { id: string; service: string; amount: number; currency: string; cycleDays: number; startISO: string; nextISO: string };
 
@@ -82,6 +107,7 @@ export default function CowrieApp() {
   const [cName, setCName] = useState("");
   const [cAddr, setCAddr] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const taRef = useRef<HTMLTextAreaElement>(null);
 
   const addr = (user?.wallet?.address || wallets[0]?.address) as `0x${string}` | undefined;
   const configured = addresses.vault?.length === 42;
@@ -121,6 +147,7 @@ export default function CowrieApp() {
   }, [addr, configured]);
   useEffect(() => { refresh(); const t = setInterval(refresh, 4000); return () => clearInterval(t); }, [refresh]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy]);
+  useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; }, [input]);
   useEffect(() => { if (authenticated && configured && !greeted.current) { greeted.current = true; const h = new Date().getHours(); const tod = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; setThread((t) => (t.length ? t : [{ who: "cowrie", text: pick([`${tod}, ${firstName}. Your money's ready, tell me what to do, or tap a suggestion.`, `${tod}, ${firstName}. What should we do with your money today?`]) }])); } }, [authenticated, configured, firstName]);
   useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
@@ -223,6 +250,7 @@ export default function CowrieApp() {
       const c = it.currency && it.currency !== "AUTO" && CURRENCIES[it.currency] ? it.currency : ccy;
       const amt = (n: number) => amtStr(n, c);
       if (it.action === "reply") { if (it.remember) remember(it.remember); say({ who: "cowrie", text: it.message || it.text || it.reply || "Okay.", options: Array.isArray(it.options) ? it.options.slice(0, 4) : undefined }); }
+      else if (it.action === "discover") { const cat = ["earn", "predict", "trade"].includes(it.category) ? it.category : "earn"; const d = DAPPS[cat]; say({ who: "cowrie", text: d.intro, links: d.apps }); }
       else if (it.action === "addSubscription") { const s = addSub(it.service || "Subscription", it.amount || 0, it.currency, it.cycleDays, it.startedDaysAgo); const d = Math.ceil((new Date(s.nextISO).getTime() - Date.now()) / 86400000); say({ who: "cowrie", tone: "good", text: `Got it, ${firstName}, I'm now tracking your ${s.service}${s.amount ? ` at ${amtStr(s.amount, s.currency)}` : ""}. ${d <= 0 ? "It's due now" : `Next renewal in ${d} day${d === 1 ? "" : "s"}`}. I'll nudge you to renew or cancel, tap the bell up top.` }); }
       else if (it.action === "setAutosave") { const h = await run("setAutosave", [Math.round(it.percent * 100)], { description: `Save ${it.percent}% of everything you receive, automatically.`, successHeader: "Rule set", title: "Auto-save" }); logTx({ hash: h, title: `Auto-save ${it.percent}%`, amount: "rule", sign: "" }); say({ who: "cowrie", tone: "good", text: pick([`Done, ${firstName},${it.percent}% of everything you receive now slips into your savings pot automatically.`, `Rule set: whenever money lands, ${it.percent}% goes straight to savings. You won't have to think about it.`]) }); }
       else if (it.action === "setDailyCap") { const h = await run("setDailyCap", [toUnits(it.amount, c)], { description: `Cap your spending at ${amt(it.amount)} a day.`, successHeader: "Limit set", title: "Daily cap" }); logTx({ hash: h, title: "Daily spend cap", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: pick([`Guardrail on: you can't spend more than ${amt(it.amount)} in a day now.`, `${amt(it.amount)} a day is your ceiling, I'll stop anything over it before it goes out.`]) }); }
@@ -299,7 +327,7 @@ export default function CowrieApp() {
             {!configured && <p className="hint">Add your contract addresses to web/.env.local and restart.</p>}
             {gas === 0n && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
             <div className="chips">
-              {["Save 10% of what I receive", "Send ₦5,000 to a friend", "Pay ₦7,500 to a seller", "Give my son ₦2,000 a day"].map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
+              {["Save 10% of what I receive", "Send ₦5,000 to a friend", "Pay ₦7,500 to a seller", "Give my son ₦2,000 a day", "Grow my savings"].map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
             </div>
             <div className="thread">
               {thread.length === 0 && <p className="empty">Tell Cowrie what to do, in your own words. Try &ldquo;save 10% of everything I receive&rdquo;.</p>}
@@ -307,13 +335,14 @@ export default function CowrieApp() {
                 <div key={i} style={{ display: "contents" }}>
                   <div className={`bubble ${m.who}${m.tone ? " " + m.tone : ""}`}>{m.text}</div>
                   {m.who === "cowrie" && m.options && m.options.length > 0 && (<div className="quickrow">{m.options.map((o) => (<button key={o} className="quick" onClick={() => handle(o)} disabled={busy}>{o}</button>))}</div>)}
+                  {m.who === "cowrie" && m.links && m.links.length > 0 && (<div className="dapps">{m.links.map((d) => (<a key={d.url + d.label} className="dapp" href={d.url} target="_blank" rel="noreferrer"><span className="dapptop"><b>{d.label}</b><span className="daptag">{d.tag}</span></span><span className="dapdesc">{d.desc}</span></a>))}</div>)}
                 </div>
               ))}
               {busy && (<div className="bubble cowrie thinking"><span className="dots"><i /><i /><i /></span></div>)}
               <div ref={endRef} />
             </div>
             <div className="composer">
-              <input value={input} placeholder="Tell Cowrie what to do…" onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handle()} />
+              <textarea ref={taRef} value={input} rows={1} placeholder="Tell Cowrie what to do…" onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handle(); } }} />
               <button className="send" onClick={() => handle()} disabled={busy}>{busy ? "…" : "Send"}</button>
             </div>
           </>

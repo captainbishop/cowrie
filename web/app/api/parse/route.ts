@@ -9,6 +9,7 @@ type Intent =
   | { action: "unlockSavings"; amount: number; currency: string }
   | { action: "addSubscription"; service: string; amount: number; currency: string; cycleDays?: number; startedDaysAgo?: number }
   | { action: "addReminder"; title: string; amount: number; currency: string; dueInDays?: number; repeatDays?: number }
+  | { action: "discover"; category: "earn" | "predict" | "trade" }
   | { action: "reply"; message: string; remember?: string; options?: string[] }
   | { action: "unknown"; reason: string };
 
@@ -40,6 +41,9 @@ function rulesParse(text: string, name: string): Intent {
   const you = name || "there";
   if (/^\s*(hi+|hey+|hello|yo|sup|gm|good\s+(morning|afternoon|evening|day)|how\s+far|how\s+body|gbam|oya)\b/i.test(t))
     return { action: "reply", message: pick([`Hey ${you}. What are we doing with your money today, send, save, or set a rule?`, `${you}! Good to see you. Tell me what you'd like to do.`]) };
+  if (/\b(earn|yield|interest|invest|investing|staking|stake|apy|apr|defi|grow my (?:money|savings)|put (?:it|my money|them) to work)\b/i.test(t) && !/\d+\s*(?:%|percent)/.test(t)) return { action: "discover", category: "earn" };
+  if (/\b(predict|prediction|polymarket|betting|bet on|gamble|gambling|odds|wager)\b/i.test(t)) return { action: "discover", category: "predict" };
+  if (/\b(swap|dex|degen|perps?|leverage trading|trade\b)\b/i.test(t)) return { action: "discover", category: "trade" };
   let m: RegExpMatchArray | null;
   if ((m = t.match(/save\s+(\d+(?:\.\d+)?)\s*(?:%|percent)/i))) return { action: "setAutosave", percent: parseFloat(m[1]) };
   if (/unlock|break|withdraw/i.test(t) && /saving|pot/i.test(t)) return { action: "unlockSavings", amount: num(t), currency: detectCcy(t) };
@@ -75,8 +79,9 @@ You HAVE memory: the recent conversation is included as prior messages, plus sav
 {"action":"unlockSavings","amount":number,"currency":CODE}
 {"action":"addSubscription","service":string,"amount":number,"currency":CODE,"cycleDays":number,"startedDaysAgo":number}
 {"action":"addReminder","title":string,"amount":number,"currency":CODE,"dueInDays":number,"repeatDays":number}
+{"action":"discover","category":"earn"|"predict"|"trade"}
 {"action":"reply","message":string,"remember":string,"options":string[]}
-CODE is NGN,USD,GHS,KES,ZAR,GBP,EUR,INR, or "AUTO". For a subscription (Netflix, GOtv, DStv, Spotify, YouTube, Apple, Prime, Disney, X): cycleDays 30=monthly,7=weekly,365=yearly; startedDaysAgo from phrases like "3 weeks ago"=21, else 0; amount if stated else 0. For any other "remind me to..." (a bill, rent, airtime, a task): use addReminder with dueInDays until it's due and repeatDays 0 for one-time, 7 weekly, 30 monthly; amount only if money is involved. For anything conversational use "reply"; put a durable fact worth keeping (a slang meaning, a preference, who someone is) in "remember", else omit it. You can: send money (blocking flagged scam addresses), auto-save a %, set allowances and daily caps, add funds, track subscriptions, and set reminders for bills and tasks. When a specific amount or choice would help the user (a subscription price, a yes/no, which person to pay), include 2 to 4 short tappable options in "options" so they can select instead of typing (e.g. asking a Netflix price, options ["₦2,200","₦4,400","₦7,000","Another amount"]). Prefer offering options over asking an open question.`;
+CODE is NGN,USD,GHS,KES,ZAR,GBP,EUR,INR, or "AUTO". For a subscription (Netflix, GOtv, DStv, Spotify, YouTube, Apple, Prime, Disney, X): cycleDays 30=monthly,7=weekly,365=yearly; startedDaysAgo from phrases like "3 weeks ago"=21, else 0; amount if stated else 0. For any other "remind me to..." (a bill, rent, airtime, a task): use addReminder with dueInDays until it's due and repeatDays 0 for one-time, 7 weekly, 30 monthly; amount only if money is involved. For anything conversational use "reply"; put a durable fact worth keeping (a slang meaning, a preference, who someone is) in "remember", else omit it. You can: send money (blocking flagged scam addresses), auto-save a %, set allowances and daily caps, add funds, track subscriptions, set reminders for bills and tasks, and point users to real DeFi apps. Use discover when the user wants to grow or invest their money, earn yield or interest, or stake (category "earn"); wants prediction markets, betting or gambling like Polymarket (category "predict"); or wants to swap, trade, use a DEX or do degen trading (category "trade"). These apps open in a new tab and the user connects their own wallet, so never promise to invest, bet or trade for them. Keep "options" rare: only add 2 to 4 short tappable chips when the user must pick a concrete value or confirm a specific action and tapping one would finish the job, for example a subscription price (["₦2,200","₦4,400","₦7,000","Another amount"]). Never put options on greetings, explanations, or answers about what you can do, leave "options" out entirely then. When unsure, omit it.`;
 
 async function llmParse(text: string, name: string, lang: string, history: { role: string; content: string }[], ctx: string): Promise<Intent | null> {
   const key = process.env.LLM_API_KEY;
