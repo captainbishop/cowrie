@@ -1,0 +1,18 @@
+{
+  "name": "cowrie-contracts",
+  "version": "0.1.0",
+  "description": "Cowrie — talk to your money. Smart contracts on Monad.",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.js --network monadTestnet",
+    "seed": "hardhat run scripts/seed.js --network monadTestnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.17",
+    "dotenv": "^16.4.5"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}
