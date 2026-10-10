@@ -105,6 +105,7 @@ export default function CowrieApp() {
   const [tab, setTab] = useState("home");
   const [starters, setStarters] = useState<string[]>([]);
   const [earned, setEarned] = useState<bigint>(0n);
+  const [earnP, setEarnP] = useState<bigint>(0n);
   const [addAmt, setAddAmt] = useState(50000);
   const [book, setBook] = useState<{ name: string; address: `0x${string}` }[]>([]);
   const [cName, setCName] = useState("");
@@ -146,7 +147,13 @@ export default function CowrieApp() {
         publicClient.getBalance({ address: addr }),
       ]);
       setSpendable(sp as bigint); setSavings(sv as bigint); setGas(g as bigint);
-      try { const en = await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "earnedOf", args: [addr] }); setEarned(en as bigint); } catch { setEarned(0n); }
+      try {
+        const [en, ep] = await Promise.all([
+          publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "earnedOf", args: [addr] }),
+          publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "earnPrincipal", args: [addr] }),
+        ]);
+        setEarned(en as bigint); setEarnP(ep as bigint);
+      } catch { setEarned(0n); setEarnP(0n); }
     } catch {}
   }, [addr, configured]);
   useEffect(() => { refresh(); const t = setInterval(refresh, 4000); return () => clearInterval(t); }, [refresh]);
@@ -249,6 +256,15 @@ export default function CowrieApp() {
     catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
     finally { setBusy(false); }
   }
+  async function earnMore(n: number) {
+    if (busy || n <= 0) return;
+    const units = toUnits(n, ccy);
+    if (units > spendable) { flash("Not enough spendable"); return; }
+    setBusy(true);
+    try { const h = await run("startEarning", [units], { description: `Move ${amtStr(n)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amtStr(n), sign: "" }); say({ who: "cowrie", tone: "good", text: `${amtStr(n)} added to your Earn vault.` }); await refresh(); }
+    catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
+    finally { setBusy(false); }
+  }
   async function handle(override?: string) {
     const text = (typeof override === "string" ? override : input).trim();
     if (!text || busy) return;
@@ -339,7 +355,7 @@ export default function CowrieApp() {
             {brand && (<button className="scenebanner" style={{ color: brand.color, borderColor: brand.color }} onClick={() => setBrand(null)}><span className="cdot" style={{ background: brand.color }} /><span>{brand.label}, want this as a monthly plan?</span></button>)}
             {low && !brand && (<button className="lownote" onClick={() => setTab("add")}>You&rsquo;re running low, tap to top up.</button>)}
             {alertCount > 0 && (<button className="remind" onClick={() => setTab("alerts")}><span className="cdot" style={{ background: "var(--brass)" }} /><span>{dueSubs[0].s.service} {dueSubs[0].days <= 0 ? "is due now" : `${dueSubs[0].s.cycleDays > 0 ? "renews" : "due"} in ${dueSubs[0].days} day${dueSubs[0].days === 1 ? "" : "s"}`}, tap to review</span></button>)}
-            {earned > 0n && (<div className="earnstrip"><div className="ei"><b>Earning {mask(cfmt(earned))}</b><small>Cowrie vault · 10% a year</small></div><button className="earnw" onClick={withdrawEarnings} disabled={busy}>Withdraw</button></div>)}
+            {earned > 0n && (<button className="earnstrip" onClick={() => setTab("activity")}><span className="ei"><b>Earning {mask(cfmt(earned))}</b><small>Cowrie vault · 10% a year, tap to manage</small></span><span className="earnw">Manage</span></button>)}
             {!configured && <p className="hint">Add your contract addresses to web/.env.local and restart.</p>}
             {gas === 0n && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
             <div className="chips">
@@ -366,6 +382,20 @@ export default function CowrieApp() {
         {tab === "activity" && (
           <div className="panel">
             <h2 className="ptitle">Activity</h2>
+            {earned > 0n && (
+              <section className="poslist">
+                <div className="poshead">Your money at work</div>
+                <div className="poscard">
+                  <div className="posrow"><span className="posname">Cowrie Earn vault</span><span className="postag">10% a year</span></div>
+                  <div className="posval">{mask(cfmt(earned))}</div>
+                  <div className="possub">{mask("principal " + cfmt(earnP))} · {mask("yield " + cfmt(earned > earnP ? earned - earnP : 0n))} · about {amtStr(Math.round(conv(earnP, ccy) * 0.1))} a year</div>
+                  <div className="posacts">
+                    <button className="mini pay" onClick={() => earnMore(10000)} disabled={busy || toUnits(10000, ccy) > spendable}>Add {amtStr(10000)}</button>
+                    <button className="mini ghost" onClick={withdrawEarnings} disabled={busy}>Withdraw all</button>
+                  </div>
+                </div>
+              </section>
+            )}
             {history.length === 0 ? <p className="muted">No transactions yet. Anything you do with Cowrie shows up here, with a link to the Monad explorer.</p> : (
               <div className="list">
                 {history.map((h) => (
