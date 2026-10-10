@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" fill="none" role="img" aria-label="Cowrie, talk to your money, on Monad">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="300" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a2550"/><stop offset="0.55" stop-color="#1a1740"/><stop offset="1" stop-color="#141231"/>
+    </linearGradient>
+    <linearGradient id="brass" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b7872f"/><stop offset="1" stop-color="#e7c892"/>
+    </linearGradient>
+    <linearGradient id="shell" x1="98" y1="72" x2="202" y2="228" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f3ead6"/><stop offset="1" stop-color="#c69a3f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="300" fill="url(#bg)"/>
+  <rect width="1200" height="6" fill="url(#brass)"/>
+  <circle cx="1070" cy="150" r="150" fill="#ffffff" opacity="0.04"/>
+  <circle cx="1070" cy="150" r="96" fill="#ffffff" opacity="0.03"/>
+  <g transform="translate(150,152)">
+    <ellipse cx="0" cy="0" rx="52" ry="78" fill="url(#shell)" stroke="#9c7526" stroke-width="2"/>
+    <path d="M0 -64 C -14 -30, -14 30, 0 64 C 14 30, 14 -30, 0 -64 Z" fill="#1b1733"/>
+    <g stroke="#1b1733" stroke-width="4.5" stroke-linecap="round">
+      <line x1="-24" y1="-39" x2="-11" y2="-39"/><line x1="-24" y1="-26" x2="-11" y2="-26"/><line x1="-24" y1="-13" x2="-11" y2="-13"/><line x1="-24" y1="0" x2="-11" y2="0"/><line x1="-24" y1="13" x2="-11" y2="13"/><line x1="-24" y1="26" x2="-11" y2="26"/><line x1="-24" y1="39" x2="-11" y2="39"/>
+      <line x1="11" y1="-39" x2="24" y2="-39"/><line x1="11" y1="-26" x2="24" y2="-26"/><line x1="11" y1="-13" x2="24" y2="-13"/><line x1="11" y1="0" x2="24" y2="0"/><line x1="11" y1="13" x2="24" y2="13"/><line x1="11" y1="26" x2="24" y2="26"/><line x1="11" y1="39" x2="24" y2="39"/>
+    </g>
+  </g>
+  <text x="252" y="138" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="82" font-weight="800" fill="#f4f2fb" letter-spacing="-2">Cowrie</text>
+  <text x="256" y="190" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="30" font-weight="500" fill="#c9c6e6">Talk to your money.</text>
+  <text x="256" y="232" font-family="'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" font-weight="700" fill="#e7c892" letter-spacing="3">ON MONAD</text>
+</svg>

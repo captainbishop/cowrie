@@ -1,21 +1,47 @@
+<p align="center">
+  <img src="docs/banner.svg" alt="Cowrie, talk to your money, on Monad" width="100%">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Monad-testnet-836EF9?style=flat-square" alt="Monad testnet">
+  <img src="https://img.shields.io/badge/Solidity-0.8.28-363636?style=flat-square" alt="Solidity 0.8.28">
+  <img src="https://img.shields.io/badge/Next.js-14-000000?style=flat-square" alt="Next.js 14">
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square" alt="TypeScript 5">
+  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT license">
+  <img src="https://img.shields.io/badge/PRs-welcome-6c4ae6?style=flat-square" alt="PRs welcome">
+</p>
+
 # Cowrie
 
-Talk to your money. Cowrie is a stablecoin wallet on Monad where you say what you want in plain language and it happens: send money, save a percentage of what you receive, cap your daily spending, give someone a daily allowance, and track subscriptions so you get reminded before each renewal. Every payment is checked against a scam-address list before it leaves your wallet.
+Talk to your money. Cowrie is a stablecoin wallet on Monad where you say what you want in plain language and it happens: send money, save a share of what you receive, cap your daily spending, give someone a daily allowance, and track subscriptions so you get reminded before each renewal. Every payment is checked against a scam-address list before it leaves your wallet.
 
-It runs on Monad testnet with a test stablecoin. When an AI key is connected the assistant understands free-form requests, including Nigerian Pidgin; without one it falls back to a built-in parser so the app still works.
+When an AI key is connected the assistant understands free-form requests, including Nigerian Pidgin, and offers tap-to-pick options instead of making you type. Without a key it falls back to a built-in parser so the app still works.
 
-## What's in the repo
+## What it does
 
-- `contracts/` is the Solidity (Hardhat):
-  - `PolicyVault.sol` holds each person's balance and enforces the rules: auto-save a percentage of money received, a daily spend cap, streaming allowances, and a send that reverts if the recipient is flagged.
-  - `ScamRegistry.sol` is the reportable scam-address list that `PolicyVault` checks on every send.
-  - `MockUSD.sol` is a 6-decimal test stablecoin (cUSD) that anyone can mint on testnet.
-- `scripts/` has deploy, seed, a throwaway-key generator, and a wallet funder.
-- `web/` is the app (Next.js): Privy sign-in, the chat screen, the balance card, People (saved addresses), Add (top up), and Reminders.
+- Send money by saved name or wallet address, with a scam check before every payment.
+- Save a set percentage of everything you receive, automatically.
+- Cap how much you can spend in a day.
+- Give someone a daily allowance that tops itself up.
+- Track subscriptions and bills, with a reminder before each one is due to pay or cancel.
+- Sign in with Google through Privy, no seed phrase, with amounts shown in your own currency.
+
+## At a glance
+
+| | |
+|---|---|
+| Chain | Monad testnet (chain id 10143) |
+| Contracts | PolicyVault, ScamRegistry, MockUSD |
+| App | Next.js, Privy, viem |
+| Currencies shown | NGN, USD, GHS, KES, ZAR, GBP, EUR, INR |
+
+## How it works
+
+`PolicyVault` holds each person's balance and enforces the rules on-chain: it splits a percentage of money received into savings, blocks a send over the daily cap, streams allowances, and reverts a send to any address `ScamRegistry` has flagged. `ScamRegistry` is the reportable scam list. `MockUSD` is a 6-decimal test stablecoin (cUSD) anyone can mint on testnet. The web app signs you in with Privy and turns your words into those on-chain calls.
 
 ## Run the contracts
 
-From this folder on Windows:
+From the repo root on Windows:
 
 ```bat
 npm install
@@ -54,4 +80,15 @@ Open http://localhost:3000.
 - ScamRegistry: `0xed9e8390200a6d12c3780E9a36a292c1c9d194Dd`
 - MockUSD (cUSD): `0xecB5a014cdD0a79637E70001314851300fCa3cAC`
 
-Chain id 10143, RPC https://testnet-rpc.monad.xyz, explorer https://testnet.monadexplorer.com, faucet https://faucet.monad.xyz.
+Explorer https://testnet.monadexplorer.com, RPC https://testnet-rpc.monad.xyz, faucet https://faucet.monad.xyz.
+
+## Repo layout
+
+- `contracts/` the Solidity (Hardhat).
+- `scripts/` deploy, seed, key generator, wallet funder.
+- `web/` the Next.js app.
+- `docs/` the banner.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

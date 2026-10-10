@@ -236,7 +236,14 @@ export default function CowrieApp() {
     } catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
     finally { setBusy(false); }
   }
-  if (!ready) return <div className="screen"><div className="phone"><p className="loading">Loading…</p></div></div>;
+  if (!ready) return (
+    <div className="splash">
+      <div className="splashmark"><CowrieMark size={76} /></div>
+      <div className="splashword">Cowrie</div>
+      <div className="splashbar"><span /></div>
+      <div className="splashsub">getting your money ready</div>
+    </div>
+  );
   if (!authenticated)
     return (
       <div className="screen"><div className="phone">
