@@ -13,9 +13,9 @@
 
 # Cowrie
 
-Talk to your money. Cowrie is a stablecoin wallet on Monad where you say what you want in plain language and it happens: send money, save a share of what you receive, cap your daily spending, give someone a daily allowance, and track subscriptions so you get reminded before each renewal. Every payment is checked against a scam-address list before it leaves your wallet.
+Talk to your money. Cowrie is a stablecoin wallet on Monad where you say what you want in plain language and it happens: send money, save a share of what you receive, cap your daily spending, give someone a daily allowance, check your balance, track subscriptions so you get reminded before each renewal, and find DeFi apps when you want to earn, trade, or predict. Every payment is checked against a scam-address list before it leaves your wallet.
 
-When an AI key is connected the assistant understands free-form requests, including Nigerian Pidgin, and offers tap-to-pick options instead of making you type. Without a key it falls back to a built-in parser so the app still works.
+When an AI key is connected the assistant understands free-form requests, including Nigerian Pidgin. It remembers what you tell it and the rest of the conversation, answers questions about your balance from the live chain, and offers tap-to-pick options when a choice saves you typing. Without a key it falls back to a built-in parser so the app still works.
 
 ## What it does
 
@@ -24,6 +24,9 @@ When an AI key is connected the assistant understands free-form requests, includ
 - Cap how much you can spend in a day.
 - Give someone a daily allowance that tops itself up.
 - Track subscriptions and bills, with a reminder before each one is due to pay or cancel.
+- Ask what your balance is and get the real figure, read straight from the chain.
+- Find DeFi apps for earning yield, trading, or prediction markets, and open them to connect your own wallet. Cowrie never moves your money for you.
+- Talk to an assistant that remembers you, replies in your language, and shows a screen that warms when your balance runs low.
 - Sign in with Google through Privy, no seed phrase, with amounts shown in your own currency.
 
 ## At a glance
@@ -33,11 +36,23 @@ When an AI key is connected the assistant understands free-form requests, includ
 | Chain | Monad testnet (chain id 10143) |
 | Contracts | PolicyVault, ScamRegistry, MockUSD |
 | App | Next.js, Privy, viem |
+| Assistant | any OpenAI-compatible model, Gemini by default, with a no-key fallback |
+| DeFi links | Kintsu, Aave, Kuru, Polymarket, and the Monad app directory |
 | Currencies shown | NGN, USD, GHS, KES, ZAR, GBP, EUR, INR |
 
 ## How it works
 
 `PolicyVault` holds each person's balance and enforces the rules on-chain: it splits a percentage of money received into savings, blocks a send over the daily cap, streams allowances, and reverts a send to any address `ScamRegistry` has flagged. `ScamRegistry` is the reportable scam list. `MockUSD` is a 6-decimal test stablecoin (cUSD) anyone can mint on testnet. The web app signs you in with Privy and turns your words into those on-chain calls.
+
+## Earning, trading, and predicting
+
+Cowrie keeps your money in your own wallet and never deposits it into an outside protocol for you. When you ask about earning, trading, or predicting, it suggests apps that do that job and opens them in a new tab for you to connect your wallet yourself:
+
+- Earn yield: Kintsu, for liquid staking on Monad, and Aave, for lending.
+- Trade: Kuru, an on-chain order-book exchange on Monad.
+- Predict: Polymarket, for backing real-world outcomes.
+
+There is a link to the Monad app directory as well, for finding more.
 
 ## Run the contracts
 
