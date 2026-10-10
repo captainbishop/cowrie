@@ -10,6 +10,7 @@ type Intent =
   | { action: "addSubscription"; service: string; amount: number; currency: string; cycleDays?: number; startedDaysAgo?: number }
   | { action: "addReminder"; title: string; amount: number; currency: string; dueInDays?: number; repeatDays?: number }
   | { action: "discover"; category: "earn" | "predict" | "trade" }
+  | { action: "balance" }
   | { action: "reply"; message: string; remember?: string; options?: string[] }
   | { action: "unknown"; reason: string };
 
@@ -61,6 +62,7 @@ function rulesParse(text: string, name: string): Intent {
     return { action: "send", to: to.trim(), amount: num(t), currency: detectCcy(t) };
   }
   if (/\b(add|top\s*up|fund|load|mint|deposit)\b/i.test(t)) return { action: "fund", amount: num(t), currency: detectCcy(t) };
+  if (/\b(balance|how much (?:do|have|'?ve) i|how much i get|wetin i get|what(?:'?s| is) my (?:balance|money)|how much money)\b/i.test(t) && !/unlock|break|withdraw|send|pay|cap|limit|sub/i.test(t)) return { action: "balance" };
   if (/\bremind\b|reminder|don'?t let me forget/i.test(t)) return { action: "addReminder", title: (t.replace(/.*remind me (to |about )?/i, "").trim().slice(0, 40) || "Reminder"), amount: num(t), currency: detectCcy(t), dueInDays: 7, repeatDays: /\b(every|monthly|weekly|each month|each week)\b/i.test(t) ? (/week/i.test(t) ? 7 : 30) : 0 };
   if (/(netflix|spotify|youtube|gotv|dstv|showmax|apple|prime|disney)/i.test(t) && /(pay|sub|subscribe|run|renew|recharge|plan|option|list)/i.test(t) && !/\d/.test(t)) {
     const svc = t.match(/netflix|spotify|youtube|gotv|dstv|showmax|apple|prime|disney/i)![0];
@@ -80,8 +82,9 @@ You HAVE memory: the recent conversation is included as prior messages, plus sav
 {"action":"addSubscription","service":string,"amount":number,"currency":CODE,"cycleDays":number,"startedDaysAgo":number}
 {"action":"addReminder","title":string,"amount":number,"currency":CODE,"dueInDays":number,"repeatDays":number}
 {"action":"discover","category":"earn"|"predict"|"trade"}
+{"action":"balance"}
 {"action":"reply","message":string,"remember":string,"options":string[]}
-CODE is NGN,USD,GHS,KES,ZAR,GBP,EUR,INR, or "AUTO". For a subscription (Netflix, GOtv, DStv, Spotify, YouTube, Apple, Prime, Disney, X): cycleDays 30=monthly,7=weekly,365=yearly; startedDaysAgo from phrases like "3 weeks ago"=21, else 0; amount if stated else 0. For any other "remind me to..." (a bill, rent, airtime, a task): use addReminder with dueInDays until it's due and repeatDays 0 for one-time, 7 weekly, 30 monthly; amount only if money is involved. For anything conversational use "reply"; put a durable fact worth keeping (a slang meaning, a preference, who someone is) in "remember", else omit it. You can: send money (blocking flagged scam addresses), auto-save a %, set allowances and daily caps, add funds, track subscriptions, set reminders for bills and tasks, and point users to real DeFi apps. Use discover when the user wants to grow or invest their money, earn yield or interest, or stake (category "earn"); wants prediction markets, betting or gambling like Polymarket (category "predict"); or wants to swap, trade, use a DEX or do degen trading (category "trade"). These apps open in a new tab and the user connects their own wallet, so never promise to invest, bet or trade for them. Keep "options" rare: only add 2 to 4 short tappable chips when the user must pick a concrete value or confirm a specific action and tapping one would finish the job, for example a subscription price (["₦2,200","₦4,400","₦7,000","Another amount"]). Never put options on greetings, explanations, or answers about what you can do, leave "options" out entirely then. When unsure, omit it.`;
+CODE is NGN,USD,GHS,KES,ZAR,GBP,EUR,INR, or "AUTO". For a subscription (Netflix, GOtv, DStv, Spotify, YouTube, Apple, Prime, Disney, X): cycleDays 30=monthly,7=weekly,365=yearly; startedDaysAgo from phrases like "3 weeks ago"=21, else 0; amount if stated else 0. For any other "remind me to..." (a bill, rent, airtime, a task): use addReminder with dueInDays until it's due and repeatDays 0 for one-time, 7 weekly, 30 monthly; amount only if money is involved. For anything conversational use "reply"; put a durable fact worth keeping (a slang meaning, a preference, who someone is) in "remember", else omit it. You can: send money (blocking flagged scam addresses), auto-save a %, set allowances and daily caps, add funds, track subscriptions, set reminders for bills and tasks, and point users to real DeFi apps. Use discover when the user wants to grow or invest their money, earn yield or interest, or stake (category "earn"); wants prediction markets, betting or gambling like Polymarket (category "predict"); or wants to swap, trade, use a DEX or do degen trading (category "trade"). These apps open in a new tab and the user connects their own wallet, so never promise to invest, bet or trade for them. If the user asks how much they have, their balance, savings or gas, reply with {"action":"balance"} and nothing else, the app fills in the exact live figures, so never state a money amount or balance from your own guess. Keep "options" rare: only add 2 to 4 short tappable chips when the user must pick a concrete value or confirm a specific action and tapping one would finish the job, for example a subscription price (["₦2,200","₦4,400","₦7,000","Another amount"]). Never put options on greetings, explanations, or answers about what you can do, leave "options" out entirely then. When unsure, omit it.`;
 
 async function llmParse(text: string, name: string, lang: string, history: { role: string; content: string }[], ctx: string): Promise<Intent | null> {
   const key = process.env.LLM_API_KEY;
@@ -107,12 +110,12 @@ async function llmParse(text: string, name: string, lang: string, history: { rol
 }
 
 export async function POST(req: NextRequest) {
-  const { text, name, lang, history, facts, subs } = await req.json().catch(() => ({ text: "" }));
+  const { text, name, lang, history, facts, subs, bal } = await req.json().catch(() => ({ text: "" }));
   if (!text || typeof text !== "string") return NextResponse.json({ ok: false, error: "no text" }, { status: 400 });
   const nm = typeof name === "string" && name ? name : "there";
   const lg = typeof lang === "string" && lang ? lang : "Auto";
   const hist = Array.isArray(history) ? history.filter((m) => m && typeof m.content === "string" && (m.role === "user" || m.role === "assistant")).slice(-10) : [];
-  const ctx = ` Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}.`;
+  const ctx = ` The user's CURRENT live balances (authoritative, never contradict these): ${typeof bal === "string" && bal ? bal : "unknown"}. Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}.`;
   const llm = await llmParse(text, nm, lg, hist, ctx);
   const intent = llm && (llm as { action?: string }).action ? llm : rulesParse(text, nm);
   return NextResponse.json({ ok: true, intent, source: llm ? "llm" : "rules" });
