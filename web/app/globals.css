@@ -167,4 +167,23 @@ body { background:var(--bg-grad); background-attachment:fixed; color:var(--text)
 .postag { font-size:10.5px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; color:var(--brand-soft-ink); background:var(--brand-soft); border-radius:999px; padding:3px 9px; white-space:nowrap; }
 .posval { font-family:"Bricolage Grotesque",sans-serif; font-weight:800; font-size:26px; letter-spacing:-0.02em; margin-top:8px; font-variant-numeric:tabular-nums; }
 .possub { font-size:12.5px; color:var(--dim); margin-top:4px; }
-.posacts { display:flex; gap:8px; margin-top:12px; }
+.posacts { display:flex; gap:8px; margin-top:10px; }
+.posfield { margin-top:12px; }
+.posfield input { width:100%; padding:11px 13px; border-radius:12px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); font-size:14px; font-family:inherit; outline:none; }
+.posfield input:focus { border-color:var(--brand); }
+.acthead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 2px 14px; }
+.acthead .ptitle { margin:0; }
+.acthead .seg { flex:none; }
+.dashcard { position:relative; overflow:hidden; background:var(--wallet-grad); color:var(--wallet-text); border-radius:18px; padding:16px 18px; margin-bottom:16px; box-shadow:0 14px 30px -18px rgba(26,18,70,.5); }
+.dashcard::before { content:""; position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--brass),var(--brass-2)); }
+.dashcard .dl { font-size:12.5px; color:var(--wallet-dim); }
+.dashcard .dv { font-family:"Bricolage Grotesque",sans-serif; font-weight:800; font-size:34px; letter-spacing:-0.03em; margin-top:3px; font-variant-numeric:tabular-nums; }
+.dashcard .ds { font-size:12.5px; color:#c9c6e6; margin-top:4px; }
+.pcard { background:var(--surface); border:1px solid var(--border); border-radius:16px; margin-bottom:9px; box-shadow:0 6px 16px -14px rgba(20,16,50,.5); overflow:hidden; }
+.prow { width:100%; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 15px; background:none; border:0; font-family:inherit; cursor:pointer; text-align:left; color:var(--text); }
+.prl { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.prl b { font-size:14px; font-weight:700; } .prl small { font-size:12px; color:var(--dim); }
+.prr { display:flex; align-items:center; gap:10px; flex:none; } .prr b { font-size:14px; font-weight:700; font-variant-numeric:tabular-nums; }
+.muted2 { font-size:12px; color:var(--dim); }
+.chev { font-size:10px; color:var(--dim); }
+.posexp { padding:0 15px 14px; }

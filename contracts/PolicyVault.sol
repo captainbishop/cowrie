@@ -39,6 +39,19 @@ contract PolicyVault is ReentrancyGuard {
     mapping(address => uint256) public earnPrincipal; // balance moved into the earn vault
     mapping(address => uint256) public earnSince; // timestamp of the last accrual
 
+    // swap: a constant-product AMM, cUSD against any token that has a pool
+    mapping(address => uint256) public poolCusd; // cUSD reserve per asset
+    mapping(address => uint256) public poolTok; // asset reserve per asset
+    mapping(address => mapping(address => uint256)) public holding; // user => asset => amount held
+    address[] public listedTokens;
+
+    // predict: a simple parimutuel YES/NO prediction market
+    struct Market { string question; uint64 closeTime; bool resolved; bool outcome; uint256 poolYes; uint256 poolNo; }
+    Market[] public markets;
+    mapping(uint256 => mapping(address => uint256)) public betYes;
+    mapping(uint256 => mapping(address => uint256)) public betNo;
+    mapping(uint256 => mapping(address => bool)) public claimedBet;
+
     event Deposited(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event Sent(address indexed from, address indexed to, uint256 amount, uint256 autoSaved);
@@ -50,6 +63,12 @@ contract PolicyVault is ReentrancyGuard {
     event EarnStarted(address indexed user, uint256 amount);
     event EarnStopped(address indexed user, uint256 amount);
     event YieldPaid(address indexed user, uint256 amount);
+    event PoolSeeded(address indexed asset, uint256 cusd, uint256 tok);
+    event Swapped(address indexed user, address indexed asset, bool cusdToToken, uint256 amountIn, uint256 amountOut);
+    event MarketCreated(uint256 indexed id, string question, uint64 closeTime);
+    event Predicted(uint256 indexed id, address indexed user, bool side, uint256 amount);
+    event MarketResolved(uint256 indexed id, bool outcome);
+    event PredictionClaimed(uint256 indexed id, address indexed user, uint256 payout);
 
     constructor(IMintableUSD _token, IScamRegistry _scam) {
         token = _token;
@@ -206,6 +225,119 @@ contract PolicyVault is ReentrancyGuard {
         if (p == 0 || since == 0 || block.timestamp <= since) return p;
         uint256 earned = (p * EARN_APR_BPS * (block.timestamp - since)) / (10000 * 365 days);
         return p + earned;
+    }
+
+    // ---------- swap: a constant-product AMM, cUSD against any token ----------
+    /// @notice Add liquidity for an asset's cUSD pool. Open on testnet so the demo can seed pools.
+    function seedPool(address asset, uint256 cusdAmount, uint256 assetAmount) external nonReentrant {
+        require(asset != address(0) && asset != address(token), "bad asset");
+        require(cusdAmount > 0 && assetAmount > 0, "zero");
+        require(token.transferFrom(msg.sender, address(this), cusdAmount), "cusd in");
+        require(IERC20(asset).transferFrom(msg.sender, address(this), assetAmount), "asset in");
+        if (poolCusd[asset] == 0 && poolTok[asset] == 0) listedTokens.push(asset);
+        poolCusd[asset] += cusdAmount;
+        poolTok[asset] += assetAmount;
+        emit PoolSeeded(asset, cusdAmount, assetAmount);
+    }
+
+    /// @notice Swap spendable cUSD for an asset; the asset is kept in your Cowrie holding.
+    function swapCusdForToken(address asset, uint256 cusdIn) external nonReentrant returns (uint256 out) {
+        require(poolCusd[asset] > 0 && poolTok[asset] > 0, "no pool");
+        require(cusdIn > 0 && spendable[msg.sender] >= cusdIn, "insufficient");
+        uint256 inWithFee = (cusdIn * 997) / 1000;
+        out = (poolTok[asset] * inWithFee) / (poolCusd[asset] + inWithFee);
+        require(out > 0 && out < poolTok[asset], "bad out");
+        spendable[msg.sender] -= cusdIn;
+        poolCusd[asset] += cusdIn;
+        poolTok[asset] -= out;
+        holding[msg.sender][asset] += out;
+        emit Swapped(msg.sender, asset, true, cusdIn, out);
+    }
+
+    /// @notice Swap an asset you hold back into spendable cUSD.
+    function swapTokenForCusd(address asset, uint256 tokIn) external nonReentrant returns (uint256 out) {
+        require(poolCusd[asset] > 0 && poolTok[asset] > 0, "no pool");
+        require(tokIn > 0 && holding[msg.sender][asset] >= tokIn, "insufficient");
+        uint256 inWithFee = (tokIn * 997) / 1000;
+        out = (poolCusd[asset] * inWithFee) / (poolTok[asset] + inWithFee);
+        require(out > 0 && out < poolCusd[asset], "bad out");
+        holding[msg.sender][asset] -= tokIn;
+        poolTok[asset] += tokIn;
+        poolCusd[asset] -= out;
+        spendable[msg.sender] += out;
+        emit Swapped(msg.sender, asset, false, tokIn, out);
+    }
+
+    function quoteCusdForToken(address asset, uint256 cusdIn) external view returns (uint256) {
+        if (poolCusd[asset] == 0 || cusdIn == 0) return 0;
+        uint256 inWithFee = (cusdIn * 997) / 1000;
+        return (poolTok[asset] * inWithFee) / (poolCusd[asset] + inWithFee);
+    }
+
+    function quoteTokenForCusd(address asset, uint256 tokIn) external view returns (uint256) {
+        if (poolTok[asset] == 0 || tokIn == 0) return 0;
+        uint256 inWithFee = (tokIn * 997) / 1000;
+        return (poolCusd[asset] * inWithFee) / (poolTok[asset] + inWithFee);
+    }
+
+    /// @notice What your current holding of an asset is worth in cUSD if sold now.
+    function holdingValue(address user, address asset) external view returns (uint256) {
+        uint256 h = holding[user][asset];
+        if (h == 0 || poolTok[asset] == 0) return 0;
+        return (poolCusd[asset] * h) / (poolTok[asset] + h);
+    }
+
+    function listedTokensCount() external view returns (uint256) {
+        return listedTokens.length;
+    }
+
+    // ---------- predict: a parimutuel YES/NO prediction market ----------
+    function createMarket(string calldata question, uint64 closeTime) external returns (uint256 id) {
+        id = markets.length;
+        markets.push(Market(question, closeTime, false, false, 0, 0));
+        emit MarketCreated(id, question, closeTime);
+    }
+
+    /// @notice Stake spendable cUSD on YES (true) or NO (false) of a market.
+    function predict(uint256 id, bool side, uint256 amount) external nonReentrant {
+        Market storage m = markets[id];
+        require(!m.resolved, "resolved");
+        require(amount > 0 && spendable[msg.sender] >= amount, "insufficient");
+        spendable[msg.sender] -= amount;
+        if (side) { m.poolYes += amount; betYes[id][msg.sender] += amount; }
+        else { m.poolNo += amount; betNo[id][msg.sender] += amount; }
+        emit Predicted(id, msg.sender, side, amount);
+    }
+
+    /// @notice Settle a market. Open on testnet for the demo; a production build gates this to an oracle.
+    function resolveMarket(uint256 id, bool outcome) external {
+        Market storage m = markets[id];
+        require(!m.resolved, "resolved");
+        m.resolved = true;
+        m.outcome = outcome;
+        emit MarketResolved(id, outcome);
+    }
+
+    /// @notice Claim your winnings from a resolved market (parimutuel: your stake's share of the whole pool).
+    function claimPrediction(uint256 id) external nonReentrant {
+        Market storage m = markets[id];
+        require(m.resolved, "not resolved");
+        require(!claimedBet[id][msg.sender], "claimed");
+        claimedBet[id][msg.sender] = true;
+        uint256 stake = m.outcome ? betYes[id][msg.sender] : betNo[id][msg.sender];
+        require(stake > 0, "nothing to claim");
+        uint256 winPool = m.outcome ? m.poolYes : m.poolNo;
+        uint256 payout = (stake * (m.poolYes + m.poolNo)) / winPool;
+        spendable[msg.sender] += payout;
+        emit PredictionClaimed(id, msg.sender, payout);
+    }
+
+    function marketsCount() external view returns (uint256) {
+        return markets.length;
+    }
+
+    function predictionOf(uint256 id, address user) external view returns (uint256 yes, uint256 no) {
+        return (betYes[id][user], betNo[id][user]);
     }
 
     // ---------- views ----------

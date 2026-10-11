@@ -28,6 +28,7 @@ Talk to it the way you would text a friend who handles money for you:
 - "Don't let me spend more than ₦20,000 a day." The cap holds on-chain, not on the honour system.
 - "Give my son ₦2,000 a day." A streaming allowance that tops itself up while you sleep.
 - "Grow my savings." Your money moves into Cowrie's vault and earns yield, and you pull it out whenever.
+- "Swap ₦10,000 into bitcoin." It trades through Cowrie's own on-chain pools into cBTC, which you hold and sell back whenever.
 - "Remind me before Netflix renews." It tracks your subscriptions and nudges you to pay or cancel in time.
 - "What's my balance?" The real number, read straight off the chain, never a guess.
 
@@ -41,8 +42,8 @@ When an AI key is connected it understands free-form requests, remembers what yo
 | Contracts | PolicyVault, ScamRegistry, MockUSD |
 | App | Next.js, Privy, viem |
 | Assistant | any OpenAI-compatible model, Gemini by default, with a no-key fallback |
-| Earn | Cowrie savings vault, on-chain, withdraw anytime |
-| Trade and predict | links to Kuru, Polymarket, and the Monad app directory |
+| Earn, trade, predict | all on-chain inside Cowrie: a savings vault, token swap pools, and a prediction market |
+| Everyday | pay airtime, bills and tickets, request money, split a bill |
 | Currencies shown | NGN, USD, GHS, KES, ZAR, GBP, EUR, INR |
 
 ## How it works
@@ -51,14 +52,7 @@ When an AI key is connected it understands free-form requests, remembers what yo
 
 ## Earning, trading, and predicting
 
-Earning is built in. Say "grow my savings" or "earn 50,000" and Cowrie moves that amount from your spendable into its own on-chain savings vault, where it grows at a set rate and you can withdraw anytime. On testnet the yield is simulated and funded by the faucet mint; a production version would route to a real yield source.
-
-Trading and prediction markets happen in apps built for them, so Cowrie points you to one and opens it in a new tab for you to connect your own wallet:
-
-- Trade: Kuru, an on-chain order-book exchange on Monad.
-- Predict: Polymarket, for backing real-world outcomes.
-
-There is a link to the Monad app directory as well, for finding more.
+Earning, trading and predicting are all built in, and nothing opens an outside app. Say "grow my savings" or "earn 50,000" and Cowrie moves that into its own on-chain savings vault at a set rate, to withdraw anytime. Say "swap 10,000 into bitcoin" and it trades through Cowrie's own on-chain pools, a constant-product AMM like a DEX uses, into cBTC, cETH or cGOLD, which you hold and sell back whenever. Say "bet 5,000 that Bitcoin tops $100k" and you stake on a yes or no market and claim your winnings when it resolves. On testnet the pools, the yield and the markets are seeded with faucet funds; in production they would use real liquidity and a resolver.
 
 ## Run the contracts
 
@@ -97,9 +91,9 @@ Open http://localhost:3000.
 
 ## Deployed on Monad testnet
 
-- PolicyVault: `0x213498cED496053683626F1928Db992bA770F633`
-- ScamRegistry: `0xB50776D03C92789b61A048fb7dA5B02fC0E3f7f7`
-- MockUSD (cUSD): `0x5C191aC746aD6cE5fb9357e000057Fe9087B7a03`
+- PolicyVault: `0x7fEC14BF2e5B97DBec2fc7030208eB7690BEc8bF`
+- ScamRegistry: `0xB096E6FCEd6b0d6593ED7050307611999259Ff4e`
+- MockUSD (cUSD): `0xbc477a253B2b65CB8111aa7598De3a19eF4f43C4`
 
 Explorer https://testnet.monadexplorer.com, RPC https://testnet-rpc.monad.xyz, faucet https://faucet.monad.xyz.
 
