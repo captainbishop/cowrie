@@ -32,6 +32,8 @@ export const vaultAbi = parseAbi([
   "function quoteTokenForCusd(address asset, uint256 tokIn) view returns (uint256)",
   "function holding(address, address) view returns (uint256)",
   "function holdingValue(address, address) view returns (uint256)",
+  "function poolCusd(address) view returns (uint256)",
+  "function poolTok(address) view returns (uint256)",
   "function listedTokens(uint256) view returns (address)",
   "function listedTokensCount() view returns (uint256)",
   "function marketsCount() view returns (uint256)",

@@ -15,24 +15,21 @@
 
 Most people never touch crypto, and the wallets are the reason. There is a seed phrase to lose, a gas token you must buy before you can move a single cent, and a 42-character address to paste where one wrong letter hands your money to a stranger you will never get it back from. And even a normal bank app only shows you the damage after the fact. It won't stop you overspending, save on your behalf, or warn you before a subscription bills again.
 
-Cowrie is a stablecoin wallet you talk to. You say what you want, in plain English or Nigerian Pidgin, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay someone a daily allowance, grow your balance in a savings vault, or track a subscription. Every payment is checked against a scam list before it leaves your wallet. You sign in with Google, so there is no seed phrase, the fees are too small to notice, and every amount shows in your own currency.
+Cowrie is a stablecoin wallet you talk to. You say what you want, in plain English, Pidgin, Igbo, Yoruba, Hausa or your own language, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay someone a daily allowance, grow your balance in a savings vault, or track a subscription. Every payment is checked against a scam list before it leaves your wallet. You sign in with Google, so there is no seed phrase, the fees are too small to notice, and every amount shows in your own currency.
 
 It runs on Monad, where everything settles in well under a second. Fast enough that saying a thing and watching it happen feel like the same moment.
 
 ## What it does
 
-Talk to it the way you would text a friend who handles money for you:
+Cowrie puts a whole financial life behind one sentence. What normally takes a bank app, a bureau de change, a bills app and a crypto exchange, Cowrie does from a single chat, in plain English, Pidgin, Igbo, Yoruba, Hausa and more, and settles each one on-chain in under a second.
 
-- "Send ₦5,000 to Mum." It pays her by name, after checking the address against a scam list.
-- "Save 10% of everything I receive." A tenth of every payment slips into savings on its own.
-- "Don't let me spend more than ₦20,000 a day." The cap holds on-chain, not on the honour system.
-- "Give my son ₦2,000 a day." A streaming allowance that tops itself up while you sleep.
-- "Grow my savings." Your money moves into Cowrie's vault and earns yield, and you pull it out whenever.
-- "Swap ₦10,000 into bitcoin." It trades through Cowrie's own on-chain pools into cBTC, which you hold and sell back whenever.
-- "Remind me before Netflix renews." It tracks your subscriptions and nudges you to pay or cancel in time.
-- "What's my balance?" The real number, read straight off the chain, never a guess.
+Pay and get paid: "send ₦5,000 to Mum", "buy ₦500 airtime for 0803...", "pay my light bill", "request ₦3,000 from Tunde", "split ₦30,000 three ways". It makes the payment, and for a bill it asks for the details it needs before a kobo moves.
 
-When an AI key is connected it understands free-form requests, remembers what you have told it and the rest of the conversation, and answers in your language, Pidgin included. Without one it falls back to a built-in parser, so the app still works. The screen responds as you go too, warming when your balance runs low and taking a brand's colour when you mention one.
+Put money on rails that enforce themselves: "save 10% of everything I receive", "don't let me spend more than ₦20,000 a day", "give my son ₦2,000 a day". The rules live on-chain, not on the honour system.
+
+Grow and hedge without leaving the app: "grow my savings" earns yield in Cowrie's own vault, "swap ₦10,000 into bitcoin" trades through its own pools, and "bet ₦5,000 that Bitcoin tops $100k" takes a side on an on-chain market you settle and claim yourself.
+
+Underneath, every hard edge of crypto is hidden. You sign in with Google so there is no seed phrase, the gas is too small to notice, and balances show in naira. Every payment is checked against a scam list before it leaves, and the assistant replies in whatever language you wrote in. Simple enough for someone who has never touched crypto, but deep enough to run your money on.
 
 ## At a glance
 
@@ -45,6 +42,7 @@ When an AI key is connected it understands free-form requests, remembers what yo
 | Earn, trade, predict | all on-chain inside Cowrie: a savings vault, token swap pools, and a prediction market |
 | Everyday | pay airtime, bills and tickets, request money, split a bill |
 | Currencies shown | NGN, USD, GHS, KES, ZAR, GBP, EUR, INR |
+| Languages | English, Nigerian Pidgin, Igbo, Yoruba, Hausa, French, Swahili, Arabic, Portuguese, Hindi |
 
 ## How it works
 
@@ -53,6 +51,20 @@ When an AI key is connected it understands free-form requests, remembers what yo
 ## Earning, trading, and predicting
 
 Earning, trading and predicting are all built in, and nothing opens an outside app. Say "grow my savings" or "earn 50,000" and Cowrie moves that into its own on-chain savings vault at a set rate, to withdraw anytime. Say "swap 10,000 into bitcoin" and it trades through Cowrie's own on-chain pools, a constant-product AMM like a DEX uses, into cBTC, cETH or cGOLD, which you hold and sell back whenever. Say "bet 5,000 that Bitcoin tops $100k" and you stake on a yes or no market and claim your winnings when it resolves. On testnet the pools, the yield and the markets are seeded with faucet funds; in production they would use real liquidity and a resolver.
+
+## Where Cowrie is going
+
+Cowrie today is a working consumer wallet with real on-chain DeFi inside it: a savings vault that pays yield, token pools you swap against, and a prediction market you settle yourself. The larger aim is to be the way ordinary people reach Monad DeFi at all. Monad is fast and cheap enough to run a whole retail bank on-chain, yet the people who would use one will never open a DEX, read a yield dashboard, or sign a raw transaction. Cowrie hides all of that behind a sentence: you ask for a thing, and the right contract call happens. That is what can make it a front door to the Monad economy instead of one more app to find.
+
+Credit comes next. You would borrow against what you already hold, so your savings and token balances back an over-collateralized line of credit, drawn and repaid in plain language ("borrow ₦50,000 against my savings"), with the loan's health tracked for you so a position is not liquidated out from under you. No bank and no paperwork, settled on Monad.
+
+The markets get deeper. The swap pools and the prediction market ship seeded with faucet liquidity for the demo; in production they move to real liquidity routed across Monad venues, and the market gets an on-chain resolver and a public question book so anyone can take a side on anything.
+
+The wallet grows into a payments network. Requesting money, splitting a bill, and paying another Cowrie user already work. After that comes QR scan-to-pay at a till, recurring payouts like payroll and allowances, and a merchant side that settles instantly in stablecoin while the customer still thinks in naira.
+
+And because every action is a sentence first and a contract call second, Cowrie can route someone into any protocol on Monad without them learning it is there. Staking, lending, new markets, and whatever launches next become things you ask for rather than apps you hunt down. Cowrie ends up as the consumer layer the rest of the ecosystem plugs into.
+
+What is live and what is planned stays honest throughout. The savings vault, swap pools, prediction market, payments, bills, caps, allowances, and autosave in this repo are built and deployed on Monad testnet today. Credit, real liquidity routing, the on-chain resolver, and merchant rails are the roadmap, not claims about today.
 
 ## Run the contracts
 

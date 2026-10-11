@@ -181,9 +181,9 @@ export default function CowrieApp() {
         const mc = Number(await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "marketsCount", args: [] }));
         const ms: { id: number; question: string; resolved: boolean; outcome: boolean; poolYes: bigint; poolNo: bigint; yes: bigint; no: bigint }[] = [];
         for (let i = 0; i < mc; i++) {
-          const mk = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "markets", args: [BigInt(i)] })) as { question: string; resolved: boolean; outcome: boolean; poolYes: bigint; poolNo: bigint };
-          const pos = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "predictionOf", args: [BigInt(i), addr] })) as { yes: bigint; no: bigint };
-          ms.push({ id: i, question: mk.question, resolved: mk.resolved, outcome: mk.outcome, poolYes: mk.poolYes, poolNo: mk.poolNo, yes: pos.yes, no: pos.no });
+          const mk = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "markets", args: [BigInt(i)] })) as readonly [string, bigint, boolean, boolean, bigint, bigint];
+          const pos = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "predictionOf", args: [BigInt(i), addr] })) as readonly [bigint, bigint];
+          ms.push({ id: i, question: mk[0], resolved: mk[2], outcome: mk[3], poolYes: mk[4], poolNo: mk[5], yes: pos[0], no: pos[1] });
         }
         setMarkets(ms);
       } catch {}
@@ -275,13 +275,13 @@ export default function CowrieApp() {
     }
     return null;
   }
-  async function run(fn: string, args: unknown[], ui?: { description?: string; successHeader?: string; title?: string }) {
+  async function run(fn: string, args: unknown[], ui?: { description?: string; successHeader?: string; title?: string; buttonText?: string }) {
     const data = encodeFunctionData({ abi: vaultAbi, functionName: fn as never, args: args as never });
     let hash: `0x${string}`;
     try {
       const r = await sendTransaction(
         { to: addresses.vault, data, chainId: monadTestnet.id },
-        { uiOptions: { showWalletUIs: true, buttonText: "Approve", successHeader: ui?.successHeader || "All done", successDescription: ui?.description || "", transactionInfo: { title: ui?.title || "Cowrie" } } }
+        { uiOptions: { showWalletUIs: true, buttonText: ui?.buttonText || "Confirm", successHeader: ui?.successHeader || "All done", successDescription: ui?.description || "", transactionInfo: { title: ui?.title || ui?.description || "Cowrie" } } }
       );
       hash = r.hash as `0x${string}`;
     } catch (e) {
@@ -338,7 +338,7 @@ export default function CowrieApp() {
     const units = toUnits(n, ccy);
     if (units > spendable) { flash("Not enough spendable"); return; }
     setBusy(true);
-    try { const h = await run("swapCusdForToken", [a, units], { description: `Swap ${amtStr(n)} into ${symOf(a)}.`, successHeader: "Swapped", title: "Swap" }); logTx({ hash: h, title: `Bought ${symOf(a)}`, amount: amtStr(n), sign: "neg" }); say({ who: "cowrie", tone: "good", text: `Swapped ${amtStr(n)} into ${symOf(a)}. It's in your holdings under Activity.` }); setAmtByKey((m) => ({ ...m, [a]: 0 })); await refresh(); }
+    try { const h = await run("swapCusdForToken", [a, units], { description: `Swap ${amtStr(n)} into ${symOf(a)}.`, successHeader: "Swapped", title: `Buy ${amtStr(n)} of ${symOf(a)}`, buttonText: `Buy ${symOf(a)}` }); logTx({ hash: h, title: `Bought ${symOf(a)}`, amount: amtStr(n), sign: "neg" }); say({ who: "cowrie", tone: "good", text: `Swapped ${amtStr(n)} into ${symOf(a)}. It's in your holdings under Activity.` }); setAmtByKey((m) => ({ ...m, [a]: 0 })); await refresh(); }
     catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
     finally { setBusy(false); }
   }
@@ -350,7 +350,7 @@ export default function CowrieApp() {
     if (tokIn <= 0n) return;
     const whole = tokIn >= d.holding;
     setBusy(true);
-    try { const h = await run("swapTokenForCusd", [a, tokIn], { description: `Sell ${symOf(a)} back to spendable.`, successHeader: "Sold", title: "Swap" }); logTx({ hash: h, title: `Sold ${symOf(a)}`, amount: whole ? cfmt(d.value) : amtStr(nValue), sign: "pos" }); say({ who: "cowrie", tone: "good", text: `Sold ${whole ? cfmt(d.value) : amtStr(nValue)} of ${symOf(a)} back to spendable.` }); setAmtByKey((m) => ({ ...m, [a]: 0 })); await refresh(); }
+    try { const h = await run("swapTokenForCusd", [a, tokIn], { description: `Sell ${whole ? cfmt(d.value) : amtStr(nValue)} of ${symOf(a)} back to spendable.`, successHeader: "Sold", title: `Sell ${whole ? cfmt(d.value) : amtStr(nValue)} of ${symOf(a)}`, buttonText: `Sell ${symOf(a)}` }); logTx({ hash: h, title: `Sold ${symOf(a)}`, amount: whole ? cfmt(d.value) : amtStr(nValue), sign: "pos" }); say({ who: "cowrie", tone: "good", text: `Sold ${whole ? cfmt(d.value) : amtStr(nValue)} of ${symOf(a)} back to spendable.` }); setAmtByKey((m) => ({ ...m, [a]: 0 })); await refresh(); }
     catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
     finally { setBusy(false); }
   }
@@ -501,7 +501,7 @@ export default function CowrieApp() {
                 </div>
               ))}
               {busy && (<div className="bubble cowrie thinking"><span className="dots"><i /><i /><i /></span></div>)}
-              <div ref={endRef} />
+              <div ref={endRef} style={{ scrollMarginBottom: 160 }} />
             </div>
             <div className="composer">
               <textarea ref={taRef} value={input} rows={1} placeholder="Tell Cowrie what to do…" onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handle(); } }} />
@@ -517,7 +517,7 @@ export default function CowrieApp() {
             </div>
             {actView === "portfolio" ? (
               <>
-                <section className="dashcard"><span className="dl">In DeFi</span><div className="dv">{mask(cfmt(defiTotal))}</div><div className="ds">{earned > 0n ? `${mask(cfmt(earned))} earning` : "nothing earning yet"}{heldCount > 0 ? ` · ${heldCount} holding${heldCount === 1 ? "" : "s"}` : ""}</div></section>
+                <section className="dashcard"><span className="dl">Total balance</span><div className="dv">{mask(cfmt(spendable + savings + defiTotal))}</div><div className="ds">{hidden ? "tap the eye on Home to reveal" : `${cfmt(spendable)} spendable${savings > 0n ? ` · ${cfmt(savings)} savings` : ""}${defiTotal > 0n ? ` · ${cfmt(defiTotal)} in DeFi` : ""}`}</div></section>
                 <div className="poshead">Savings</div>
                 <div className="pcard">
                   <button className="prow" onClick={() => setOpenPos(openPos === "earn" ? null : "earn")}><span className="prl"><b>Cowrie Earn vault</b><small>10% a year</small></span><span className="prr"><b>{mask(cfmt(earned))}</b><span className="chev">{openPos === "earn" ? "▲" : "▼"}</span></span></button>
