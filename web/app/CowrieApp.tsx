@@ -4,6 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -12,6 +13,14 @@ const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
   ZAR: { symbol: "R", perUsd: 18.2 }, GBP: { symbol: "£", perUsd: 0.79 },
   EUR: { symbol: "€", perUsd: 0.92 }, INR: { symbol: "₹", perUsd: 83 },
 };
+// Fair, unriggable payout order for an Ajo circle, seeded by a live Chainlink price (a public beacon no member controls).
+function seededOrder(n: number, seed: number): number[] {
+  let s = (seed >>> 0) || 1;
+  const rnd = () => { s = (s + 0x6d2b79f5) >>> 0; let t = s; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const a = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
 const DEAD = "0x000000000000000000000000000000000000dEaD" as `0x${string}`;
 const MERCHANT = "0x00000000000000000000000000000000000000A1" as `0x${string}`;
 const contacts: Record<string, `0x${string}`> = {
@@ -116,6 +125,12 @@ export default function CowrieApp() {
   const [markets, setMarkets] = useState<{ id: number; question: string; resolved: boolean; outcome: boolean; poolYes: bigint; poolNo: bigint; yes: bigint; no: bigint }[]>([]);
   const [addAmt, setAddAmt] = useState(50000);
   const [book, setBook] = useState<{ name: string; address: `0x${string}` }[]>([]);
+  const [clPrices, setClPrices] = useState<Record<string, { price: number; at: number }>>({});
+  const [guards, setGuards] = useState<{ id: string; asset: string; op: string; price: number; act: string; amount?: number; currency?: string; done?: boolean }[]>([]);
+  const [ajos, setAjos] = useState<{ id: string; name: string; amount: number; currency: string; members: { name: string; address?: string }[]; order: number[]; seedPrice: number; round: number }[]>([]);
+  const [homePanel, setHomePanel] = useState<"guardian" | "ajo" | null>(null);
+  const [nickname, setNickname] = useState("");
+  const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
   const [cName, setCName] = useState("");
   const [cAddr, setCAddr] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -123,9 +138,11 @@ export default function CowrieApp() {
 
   const addr = (user?.wallet?.address || wallets[0]?.address) as `0x${string}` | undefined;
   const configured = addresses.vault?.length === 42;
-  const anyU = user as unknown as { google?: { name?: string }; email?: { address?: string }; farcaster?: { displayName?: string }; discord?: { username?: string } } | null;
+  const anyU = user as unknown as { google?: { name?: string; email?: string }; email?: { address?: string }; farcaster?: { displayName?: string }; discord?: { username?: string } } | null;
   const rawName = anyU?.google?.name || anyU?.farcaster?.displayName || anyU?.discord?.username || anyU?.email?.address?.split("@")[0] || "there";
-  const firstName = rawName.split(/[ ._@]/)[0].replace(/^./, (ch) => ch.toUpperCase());
+  const acctName = anyU?.google?.name || anyU?.farcaster?.displayName || anyU?.discord?.username || "";
+  const acctEmail = anyU?.google?.email || anyU?.email?.address || "";
+  const firstName = nickname || rawName.split(/[ ._@]/)[0].replace(/^./, (ch) => ch.toUpperCase());
   const pick = (a: string[]) => a[Math.floor(Math.random() * a.length)];
   const greeted = useRef(false);
 
@@ -190,9 +207,28 @@ export default function CowrieApp() {
     } catch {}
   }, [addr, configured, assets]);
   useEffect(() => { refresh(); const t = setInterval(refresh, 4000); return () => clearInterval(t); }, [refresh]);
+  useEffect(() => { if (!configured) return; let on = true; const run = async () => { try { const p = await readAllFeeds(); if (on && Object.keys(p).length) setClPrices(p); } catch {} }; run(); const t = setInterval(run, 45000); return () => { on = false; clearInterval(t); }; }, [configured]);
+  useEffect(() => {
+    if (!guards.length) return;
+    let changed = false;
+    const next = guards.map((g) => {
+      if (g.done) return g;
+      const p = clPrices[g.asset]?.price; if (!p) return g;
+      const hit = g.op === "below" ? p <= g.price : p >= g.price;
+      if (!hit) return g;
+      changed = true;
+      flash(`${g.asset} hit $${g.price.toLocaleString()}`);
+      const head = `${g.asset} just went ${g.op} $${g.price.toLocaleString()}, ${firstName}. Chainlink has it at $${Math.round(p).toLocaleString()}.`;
+      if (g.act === "notify") say({ who: "cowrie", tone: "good", text: `${head} You asked me to flag it, so here it is.` });
+      else if (g.act === "protect") say({ who: "cowrie", tone: "good", text: `${head} You wanted your savings moved to safety, tap to grow them in the vault.`, options: ["Grow my savings", "Not now"] });
+      else say({ who: "cowrie", tone: "good", text: `${head} You wanted me to ${g.act}${g.amount ? " " + amtStr(g.amount) : ""}, want me to go ahead?`, options: [g.act === "sell" ? `Sell ${g.asset}` : `Buy ${g.asset}`, "Not now"] });
+      return { ...g, done: true };
+    });
+    if (changed) { setGuards(next); if (addr) persist("cowrie.guards." + addr, JSON.stringify(next)); }
+  }, [clPrices, guards, addr, firstName]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy]);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);
-  useEffect(() => { const p = [...CHIP_POOL]; for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } setStarters(p.slice(0, 3)); }, []);
+  useEffect(() => { const p = [...CHIP_POOL]; for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } setStarters(p.slice(0, 2)); }, []);
   useEffect(() => {
     if (!addr || !configured) return;
     (async () => {
@@ -214,7 +250,15 @@ export default function CowrieApp() {
   useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.book." + addr); setBook(s ? JSON.parse(s) : []); } catch {} }, [addr]);
-  useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.subs." + addr); setSubs(s ? JSON.parse(s) : []); const f = localStorage.getItem("cowrie.facts." + addr); setFacts(f ? JSON.parse(f) : []); const r = localStorage.getItem("cowrie.req." + addr); setRequests(r ? JSON.parse(r) : []); } catch {} }, [addr]);
+  useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.subs." + addr); setSubs(s ? JSON.parse(s) : []); const fArr = JSON.parse(localStorage.getItem("cowrie.facts." + addr) || "[]"); setFacts(fArr); const r = localStorage.getItem("cowrie.req." + addr); setRequests(r ? JSON.parse(r) : []);
+      const gd = localStorage.getItem("cowrie.guards." + addr); setGuards(gd ? JSON.parse(gd) : []);
+      const aj = localStorage.getItem("cowrie.ajo." + addr); setAjos(aj ? JSON.parse(aj) : []);
+      setNickname(localStorage.getItem("cowrie.nick." + addr) || "");
+      const ss = localStorage.getItem("cowrie.sessions." + addr); setSessions(ss ? JSON.parse(ss) : []);
+      const bk = JSON.parse(localStorage.getItem("cowrie.book." + addr) || "[]"); const have = new Set(bk.map((x: { address: string }) => x.address.toLowerCase())); let changed = false;
+      for (const fact of (Array.isArray(fArr) ? fArr : [])) { const m = String(fact).match(/([A-Za-z][A-Za-z0-9 ._-]{0,24}?)(?:'s)?\s*(?:=|:|is|address|wallet|at)\s*.{0,14}?(0x[a-fA-F0-9]{40})/i); if (m && !have.has(m[2].toLowerCase())) { const nm = m[1].trim().replace(/\b(my|the|a|contact|wallet|address|save|add|as|is)\b/gi, "").trim(); if (nm) { bk.push({ name: nm[0].toUpperCase() + nm.slice(1), address: m[2] }); have.add(m[2].toLowerCase()); changed = true; } } }
+      if (changed) { persist("cowrie.book." + addr, JSON.stringify(bk)); setBook(bk); }
+    } catch {} }, [addr]);
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => { const eff = theme === "system" ? (mq.matches ? "dark" : "light") : theme; document.documentElement.dataset.theme = eff; };
@@ -230,6 +274,20 @@ export default function CowrieApp() {
   const logTx = (e: Omit<Tx, "ts">) => setHistory((prev) => { const next = [{ ...e, ts: Date.now() }, ...prev].slice(0, 50); if (addr) persist("cowrie.tx." + addr, JSON.stringify(next)); return next; });
   const saveContact = (name: string, address: string) => setBook((prev) => { const next = [...prev.filter((x) => x.address.toLowerCase() !== address.toLowerCase()), { name, address: address as `0x${string}` }]; if (addr) persist("cowrie.book." + addr, JSON.stringify(next)); return next; });
   const removeContact = (address: string) => setBook((prev) => { const next = prev.filter((x) => x.address !== address); if (addr) persist("cowrie.book." + addr, JSON.stringify(next)); return next; });
+  const setNick = (n: string) => { setNickname(n); if (addr) persist("cowrie.nick." + addr, n); };
+  function saveSession() {
+    if (thread.length < 2) { flash("Nothing to save yet"); return; }
+    const firstUser = thread.find((m) => m.who === "you")?.text || "Conversation";
+    const s = { id: Date.now().toString(36), title: firstUser.slice(0, 48), ts: Date.now(), msgs: thread };
+    const next = [s, ...sessions].slice(0, 30);
+    setSessions(next); if (addr) persist("cowrie.sessions." + addr, JSON.stringify(next));
+    setThread([]); flash("Chat saved to history");
+  }
+  function openSession(id: string) {
+    const s = sessions.find((x) => x.id === id); if (!s) return;
+    setThread(s.msgs as typeof thread); setTab("home"); flash("Chat reopened");
+  }
+  function deleteSession(id: string) { const next = sessions.filter((x) => x.id !== id); setSessions(next); if (addr) persist("cowrie.sessions." + addr, JSON.stringify(next)); }
   const remember = (fact: string) => setFacts((p) => { if (!fact || p.includes(fact)) return p; const n = [...p, fact].slice(-30); if (addr) persist("cowrie.facts." + addr, JSON.stringify(n)); return n; });
   const saveSubs = (n: Sub[]) => { setSubs(n); if (addr) persist("cowrie.subs." + addr, JSON.stringify(n)); };
   const addSub = (service: string, amount: number, currency: string, cycleDays?: number, startedDaysAgo?: number) => {
@@ -294,7 +352,42 @@ export default function CowrieApp() {
     if (rcpt.status === "reverted") throw new Error("reverted on-chain");
     return hash as string;
   }
-  function txErr(e: unknown) { const msg = (e as { shortMessage?: string; message?: string })?.shortMessage || (e as Error)?.message || "something went wrong"; if (/abort|timed? ?out|timeout/i.test(msg)) return `That took longer than expected, ${firstName}. Mind trying again?`; if (/insufficient funds/i.test(msg)) return `Your wallet's out of MON for gas, ${firstName}. Top it up and I'll try again.`; if (/user rejected|denied|rejected the request/i.test(msg)) return `No problem,I cancelled that. Nothing left your wallet.`; if (/reverted/i.test(msg)) return `That didn't go through, ${firstName}, it reverted on-chain. Your balance might be short, or the pool or market isn't ready yet. Want to try again?`; return `That didn't go through: ${msg.slice(0, 110)}. Want to try again?`; }
+  function txErr(e: unknown) { const msg = (e as { shortMessage?: string; message?: string })?.shortMessage || (e as Error)?.message || "something went wrong"; if (/abort|timed? ?out|timeout/i.test(msg)) return `That took longer than expected, ${firstName}. Mind trying again?`; if (/insufficient funds/i.test(msg)) return `Your wallet's out of MON for gas, ${firstName}. Top it up and I'll try again.`; if (/user rejected|denied|rejected the request/i.test(msg)) return `No problem,I cancelled that. Nothing left your wallet.`; if (/reverted/i.test(msg)) return `That didn't go through, ${firstName}, it reverted on-chain. Your balance might be short, or the pool or market isn't ready yet. Want to try again?`; if (/rpc|request failed|http|fetch|network|connection|econn|socket|timeout|gateway|50[0-9]|429/i.test(msg)) return `The Monad network didn't answer that time, ${firstName}. Nothing left your wallet, give it a moment and try again.`; return `That didn't go through: ${msg.slice(0, 110)}. Want to try again?`; }
+  async function payContact(address: string, name: string, n: number) {
+    if (busy || n <= 0) return;
+    const to = address as `0x${string}`;
+    setBusy(true);
+    try {
+      const flagged = await publicClient.readContract({ address: addresses.scam, abi: scamAbi, functionName: "isFlagged", args: [to] });
+      if (flagged) { say({ who: "cowrie", tone: "bad", text: `Hold on, ${firstName}, that address is flagged as a scam. I didn't send anything.` }); return; }
+      const units = toUnits(n, ccy);
+      if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} to spend right now, ${firstName}. Add money or try a smaller amount.` }); return; }
+      const h = await run("send", [to, units], { description: `Send ${amtStr(n)} to ${name}.`, successHeader: "Sent", title: `Send ${amtStr(n)} to ${name}`, buttonText: "Send" });
+      logTx({ hash: h, title: `Sent to ${name}`, amount: amtStr(n), sign: "neg" });
+      setAmtByKey((m) => ({ ...m, [address]: 0 })); setOpenPos(null); setTab("home");
+      say({ who: "cowrie", tone: "good", text: `Sent ${amtStr(n)} to ${name}, ${firstName}. Landed in under a second.` });
+      await refresh();
+    } catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
+    finally { setBusy(false); }
+  }
+  function advanceAjo(id: string) { setAjos((prev) => { const n = prev.map((a) => (a.id === id ? { ...a, round: a.round + 1 } : a)); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; }); }
+  function removeAjo(id: string) { setAjos((prev) => { const n = prev.filter((a) => a.id !== id); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; }); }
+  async function payShare(id: string) {
+    const c = ajos.find((a) => a.id === id); if (!c || busy) return;
+    const recipient = c.members[c.order[c.round % c.members.length]];
+    const isYou = recipient.name === (firstName || "You") || (!!recipient.address && !!addr && recipient.address.toLowerCase() === addr.toLowerCase());
+    if (isYou) { say({ who: "cowrie", tone: "good", text: `It's your turn this cycle, ${firstName}, so you collect the pot. I'll move the circle to the next person.` }); advanceAjo(id); return; }
+    if (!recipient.address) { say({ who: "cowrie", text: `I don't have ${recipient.name}'s wallet yet, ${firstName}. Save it under People and I'll pay their turn straight away.` }); return; }
+    setBusy(true);
+    try {
+      const units = toUnits(c.amount, c.currency);
+      if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} right now, ${firstName}. Top up to pay your ajo share.` }); return; }
+      const h = await run("send", [recipient.address, units], { description: `Ajo "${c.name}": pay ${amtStr(c.amount, c.currency)} to ${recipient.name}.`, successHeader: "Share paid", title: `Ajo share to ${recipient.name}`, buttonText: "Pay share" });
+      logTx({ hash: h, title: `Ajo share to ${recipient.name}`, amount: amtStr(c.amount, c.currency), sign: "neg" });
+      say({ who: "cowrie", tone: "good", text: `Paid your ${amtStr(c.amount, c.currency)} into "${c.name}" for ${recipient.name}, ${firstName}.` });
+      advanceAjo(id); await refresh();
+    } catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); } finally { setBusy(false); }
+  }
   async function addMoney() {
     if (busy || addAmt <= 0) return;
     setBusy(true);
@@ -378,7 +471,7 @@ export default function CowrieApp() {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 25000);
       let it: any;
-      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history, facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
+      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history, facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
       finally { clearTimeout(timer); }
       const c = it.currency && it.currency !== "AUTO" && CURRENCIES[it.currency] ? it.currency : ccy;
       const amt = (n: number) => amtStr(n, c);
@@ -413,7 +506,55 @@ export default function CowrieApp() {
       }
       else if (it.action === "request") { const who = (it.from || "someone").toString(); addRequest(who, it.amount || 0, c, (it.note || "").toString()); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. I've set up a request for ${amt(it.amount || 0)}${it.note ? ` for ${it.note}` : ""}${it.from ? ` from ${it.from}` : ""}. It's under People, tap Copy to share it.` }); }
       else if (it.action === "split") { const names = Array.isArray(it.names) ? it.names.filter(Boolean).map((x: unknown) => String(x)) : []; const n = names.length || it.people || 2; const share = Math.round((it.amount || 0) / n); if (names.length) names.forEach((nm: string) => addRequest(nm, share, c, "split bill")); say({ who: "cowrie", tone: "good", text: `${amt(it.amount || 0)} split ${n} way${n === 1 ? "" : "s"} is ${amt(share)} each.${names.length ? ` I've made a request for ${names.join(", ")}, under People.` : " Tell me the names and I'll make each request."}` }); }
-      else if (it.action === "predict") { const side = String(it.side || "yes").toLowerCase() !== "no"; const hint = (it.market || "").toString().toLowerCase(); const mk = markets.find((x) => !x.resolved && hint.length > 1 && x.question.toLowerCase().includes(hint)) || markets.find((x) => !x.resolved); if (!mk) { say({ who: "cowrie", text: `No open prediction markets right now, ${firstName}. They live under Predict in the Activity tab.` }); } else if (!it.amount) { say({ who: "cowrie", text: `How much do you want to stake on "${mk.question}", ${firstName}? Open Activity and tap it under Predict to place your bet.` }); } else { await placeBet(mk.id, side, it.amount); } }
+      else if (it.action === "predict") {
+        const side = String(it.side || "yes").toLowerCase() !== "no";
+        const hint = (it.market || "").toString().toLowerCase().replace(/[^a-z0-9 ]/g, " ").trim();
+        const open = markets.filter((x) => !x.resolved);
+        const STOP = ["will", "that", "this", "your", "from", "with", "about", "close", "above", "below", "price", "year", "market", "odds", "stake", "position", "increase", "more", "some", "the", "and", "for", "put", "extra", "money", "bet"];
+        const words = hint.split(/\s+/).filter((w) => w.length >= 4 && !STOP.includes(w));
+        const matched = hint.length > 1 ? (open.find((x) => x.question.toLowerCase().includes(hint)) || open.find((x) => words.some((w) => x.question.toLowerCase().includes(w)))) : null;
+        const list = open.map((x) => `• ${x.question}`).join("\n");
+        if (open.length === 0) { say({ who: "cowrie", text: `There are no open prediction markets right now, ${firstName}. You'll find them under Predict in the Activity tab when they go live.` }); }
+        else if (hint.length > 1 && !matched) { say({ who: "cowrie", text: `I don't have a market for "${it.market}", ${firstName}. The open ones are:\n${list}\nName one of these, or open Activity and tap Predict to place your bet.` }); }
+        else if (!matched && open.length > 1) { say({ who: "cowrie", text: `Which market, ${firstName}? The open ones are:\n${list}\nName one, or tap it under Predict in Activity.` }); }
+        else { const mk = matched || open[0]; if (!it.amount) { say({ who: "cowrie", text: `How much do you want to stake on "${mk.question}" (${side ? "Yes" : "No"}), ${firstName}?`, options: ["₦1,000", "₦5,000", "₦10,000", "Another amount"] }); } else { await placeBet(mk.id, side, it.amount); } }
+      }
+      else if (it.action === "saveContact") {
+        const a = (it.address || "").toString().trim();
+        const nmRaw = (it.name || "").toString().trim();
+        if (!/^0x[a-fA-F0-9]{40}$/.test(a)) { say({ who: "cowrie", tone: "bad", text: `That address doesn't look complete, ${firstName}. Paste the full 0x address and the name, like "0x1234...abcd save as Mum".` }); }
+        else if (!nmRaw) { say({ who: "cowrie", text: `What name should I save ${shortAddr(a)} under, ${firstName}?` }); }
+        else { const nm = nmRaw[0].toUpperCase() + nmRaw.slice(1); saveContact(nm, a.toLowerCase()); say({ who: "cowrie", tone: "good", text: `Saved ${nm} to your People list, ${firstName}. You can pay them by name now, just say "send 5,000 to ${nmRaw}". Tap People to see them.` }); }
+      }
+      else if (it.action === "guardian") {
+        const key = feedKeyFor(it.asset || "");
+        if (!key) { say({ who: "cowrie", text: `Guardian watches Bitcoin and Ethereum live on Chainlink, ${firstName}. Which one should I watch, and at what price?` }); }
+        else if (!it.price || Number(it.price) <= 0) { say({ who: "cowrie", text: `At what ${key} price should I watch for you, ${firstName}?` }); }
+        else {
+          const g = { id: Date.now().toString(36), asset: key, op: it.op === "above" ? "above" : "below", price: Number(it.price), act: ["protect", "sell", "buy", "notify"].includes(it.act) ? it.act : "notify", amount: it.amount && it.amount > 0 ? it.amount : undefined, currency: it.currency && it.currency !== "AUTO" ? it.currency : ccy };
+          const next = [...guards, g]; setGuards(next); if (addr) persist("cowrie.guards." + addr, JSON.stringify(next));
+          const doing = g.act === "protect" ? "move your savings into the vault" : g.act === "sell" ? `sell${g.amount ? " " + amtStr(g.amount) : ""}` : g.act === "buy" ? `buy${g.amount ? " " + amtStr(g.amount) : ""}` : "flag it to you";
+          const now = clPrices[key]?.price;
+          say({ who: "cowrie", tone: "good", text: `Set, ${firstName}. Guardian is watching ${key} on Chainlink${now ? ` (now about $${Math.round(now).toLocaleString()})` : ""} and will ${doing} the moment it goes ${g.op} $${g.price.toLocaleString()}. Find it under Activity, Guardian.` });
+        }
+      }
+      else if (it.action === "ajo") {
+        const amt = it.amount && Number(it.amount) > 0 ? Number(it.amount) : 0;
+        const cur = it.currency && it.currency !== "AUTO" ? it.currency : ccy;
+        const names = Array.isArray(it.members) ? it.members.map((x: unknown) => String(x).trim()).filter(Boolean) : [];
+        if (!amt) { say({ who: "cowrie", text: `How much should each person put in per cycle, ${firstName}? And who's in the circle with you?` }); }
+        else if (names.length < 1) { say({ who: "cowrie", text: `Who's in the circle with you, ${firstName}? Name a couple of people, like "with Mum and Tunde" (saved contacts work best).` }); }
+        else {
+          const members = [{ name: firstName || "You", address: addr as string | undefined }, ...names.map((nm: string) => { const b = book.find((x) => x.name.toLowerCase() === nm.toLowerCase() || x.name.toLowerCase().startsWith(nm.toLowerCase())); return { name: nm[0].toUpperCase() + nm.slice(1), address: b?.address as string | undefined }; })];
+          const seedP = clPrices.BTC?.price || clPrices.ETH?.price || 0;
+          const seed = Math.floor((seedP || (Date.now() % 100000)) * 1000);
+          const circle = { id: Date.now().toString(36), name: (it.name || "My Ajo").toString(), amount: amt, currency: cur, members, order: seededOrder(members.length, seed), seedPrice: seedP, round: 0 };
+          const next = [...ajos, circle]; setAjos(next); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(next));
+          setHomePanel("ajo"); setTab("home");
+          const first = circle.members[circle.order[0]].name;
+          say({ who: "cowrie", tone: "good", text: `Your ajo "${circle.name}" is live, ${firstName}: ${members.length} people, ${amtStr(amt, cur)} each per cycle. I drew the turn order from the live Chainlink BTC price${seedP ? ` ($${Math.round(seedP).toLocaleString()})` : ""}, so nobody can rig who collects first. ${first} is up first. It's on your Home under Ajo circle.` });
+        }
+      }
       else if (it.action === "setAutosave") { const h = await run("setAutosave", [Math.round(it.percent * 100)], { description: `Save ${it.percent}% of everything you receive, automatically.`, successHeader: "Rule set", title: "Auto-save" }); logTx({ hash: h, title: `Auto-save ${it.percent}%`, amount: "rule", sign: "" }); say({ who: "cowrie", tone: "good", text: pick([`Done, ${firstName},${it.percent}% of everything you receive now slips into your savings pot automatically.`, `Rule set: whenever money lands, ${it.percent}% goes straight to savings. You won't have to think about it.`]) }); }
       else if (it.action === "setDailyCap") { const h = await run("setDailyCap", [toUnits(it.amount, c)], { description: `Cap your spending at ${amt(it.amount)} a day.`, successHeader: "Limit set", title: "Daily cap" }); logTx({ hash: h, title: "Daily spend cap", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: pick([`Guardrail on: you can't spend more than ${amt(it.amount)} in a day now.`, `${amt(it.amount)} a day is your ceiling, I'll stop anything over it before it goes out.`]) }); }
       else if (it.action === "fund") { const h = await run("mintAndDeposit", [toUnits(it.amount, c)], { description: `Add ${amt(it.amount)} to your Cowrie balance.`, successHeader: "Money added", title: "Add money" }); logTx({ hash: h, title: "Added money", amount: amt(it.amount), sign: "pos" }); say({ who: "cowrie", tone: "good", text: pick([`Topped up, ${amt(it.amount)} is in your balance.`, `${amt(it.amount)} added and ready to spend or save.`]) }); }
@@ -487,6 +628,34 @@ export default function CowrieApp() {
             {low && !brand && (<button className="lownote" onClick={() => setTab("add")}>You&rsquo;re running low, tap to top up.</button>)}
             {alertCount > 0 && (<button className="remind" onClick={() => setTab("alerts")}><span className="cdot" style={{ background: "var(--brass)" }} /><span>{dueSubs[0].s.service} {dueSubs[0].days <= 0 ? "is due now" : `${dueSubs[0].s.cycleDays > 0 ? "renews" : "due"} in ${dueSubs[0].days} day${dueSubs[0].days === 1 ? "" : "s"}`}, tap to review</span></button>)}
             {earned > 0n && (<button className="earnstrip" onClick={() => setTab("activity")}><span className="ei"><b>{mask(cfmt(earned))} in your Earn vault</b><small>Growing at 10% a year, tap to manage</small></span><span className="earnw">Manage</span></button>)}
+            <div className="feats">
+              <button className={"feat" + (homePanel === "guardian" ? " on" : "")} onClick={() => setHomePanel(homePanel === "guardian" ? null : "guardian")}><span className="fl">Guardian</span><span className="fv">{clPrices.BTC ? `BTC $${(clPrices.BTC.price / 1000).toFixed(1)}k` : "live via Chainlink"}</span></button>
+              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{ajos.length ? `${ajos.length} active` : "fair, via Chainlink"}</span></button>
+            </div>
+            {homePanel === "guardian" && (
+              <div className="hpanel">
+                <div className="poshead">Guardian <span style={{ color: "var(--brass)", fontWeight: 700 }}>· live via Chainlink</span></div>
+                <section className="dashcard">{Object.keys(clPrices).length === 0 ? <div className="ds">Connecting to Chainlink price feeds…</div> : <div className="ds" style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>{clPrices.BTC && <span><b style={{ color: "var(--text)" }}>BTC</b> ${Math.round(clPrices.BTC.price).toLocaleString()}</span>}{clPrices.ETH && <span><b style={{ color: "var(--text)" }}>ETH</b> ${Math.round(clPrices.ETH.price).toLocaleString()}</span>}<span className="muted2">verified by Chainlink</span></div>}</section>
+                {guards.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Say &ldquo;watch bitcoin and alert me if it drops below $90,000&rdquo;. Chainlink is the eyes.</p> : guards.map((g) => (
+                  <div className="pcard" key={g.id}><div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{g.asset} {g.op} ${g.price.toLocaleString()}</b><small>{g.done ? "triggered" : "watching via Chainlink"} · {g.act === "notify" ? "alert me" : g.act === "protect" ? "move to savings" : g.act}</small></span><span className="prr">{g.done ? <span style={{ color: "var(--good)", fontWeight: 700, fontSize: 12 }}>✓ fired</span> : <span style={{ color: "var(--brass)", fontSize: 12 }}>● live</span>}<button className="iconbtn" aria-label="Remove" onClick={() => { const n = guards.filter((x) => x.id !== g.id); setGuards(n); if (addr) persist("cowrie.guards." + addr, JSON.stringify(n)); }}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></span></div></div>
+                ))}
+              </div>
+            )}
+            {homePanel === "ajo" && (
+              <div className="hpanel">
+                <div className="poshead">Ajo circle <span style={{ color: "var(--brass)", fontWeight: 700 }}>· fair draw via Chainlink</span></div>
+                {ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; return (
+                  <div className="pcard" key={c.id}>
+                    <div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{c.name}</b><small>{amtStr(c.amount, c.currency)} each · {c.members.length} people · cycle {Math.min(c.round + 1, c.members.length)}/{c.members.length}</small></span><button className="iconbtn" aria-label="Remove" onClick={() => removeAjo(c.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></div>
+                    <div className="posexp">
+                      <div className="ds" style={{ marginBottom: 6 }}>Turn order <span style={{ color: "var(--brass)" }}>· drawn from Chainlink{c.seedPrice ? ` BTC $${Math.round(c.seedPrice).toLocaleString()}` : ""}</span></div>
+                      <div className="ajorder">{c.order.map((idx, pos) => (<span key={pos} className={"ajochip" + (!done && pos === turn ? " on" : "")}>{pos + 1}. {c.members[idx].name}</span>))}</div>
+                      {done ? <span className="muted2">Circle complete, everyone has collected.</span> : <div className="posacts"><button className="mini pay" onClick={() => payShare(c.id)} disabled={busy}>{recipient.name === (firstName || "You") ? "Your turn, collect the pot" : `Pay ${amtStr(c.amount, c.currency)} to ${recipient.name}`}</button></div>}
+                    </div>
+                  </div>
+                ); })}
+              </div>
+            )}
             {!configured && <p className="hint">Add your contract addresses to web/.env.local and restart.</p>}
             {gas === 0n && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
             <div className="chips">
@@ -501,7 +670,7 @@ export default function CowrieApp() {
                 </div>
               ))}
               {busy && (<div className="bubble cowrie thinking"><span className="dots"><i /><i /><i /></span></div>)}
-              <div ref={endRef} style={{ scrollMarginBottom: 160 }} />
+              <div ref={endRef} style={{ scrollMarginBottom: 200 }} />
             </div>
             <div className="composer">
               <textarea ref={taRef} value={input} rows={1} placeholder="Tell Cowrie what to do…" onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handle(); } }} />
@@ -651,10 +820,21 @@ export default function CowrieApp() {
             <button className="primary" disabled={!cName.trim() || !/^0x[a-fA-F0-9]{40}$/.test(cAddr.trim())} onClick={() => { saveContact(cName.trim(), cAddr.trim()); setCName(""); setCAddr(""); flash("Contact saved"); }}>Save contact</button>
             <div className="list" style={{ marginTop: 16 }}>
               {book.length === 0 ? <p className="muted">No saved people yet. Add someone you pay often, then pay them by name, like &ldquo;send 5,000 to Mum&rdquo;.</p> : book.map((b) => (
-                <div className="txrow" key={b.address}>
-                  <div className="ic">{b.name.slice(0, 1).toUpperCase()}</div>
-                  <div className="mid"><b>{b.name}</b><span style={{ color: "var(--dim)", fontSize: 12 }}>{b.address.slice(0, 6)}…{b.address.slice(-4)}</span></div>
-                  <button className="iconbtn" aria-label="Remove" onClick={() => removeContact(b.address)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button>
+                <div className="pcard" key={b.address}>
+                  <button className="prow" onClick={() => setOpenPos(openPos === "pay:" + b.address ? null : "pay:" + b.address)}>
+                    <span className="prl"><b>{b.name}</b><small>{b.address.slice(0, 6)}…{b.address.slice(-4)}</small></span>
+                    <span className="prr"><small className="muted2">Pay</small><span className="chev">{openPos === "pay:" + b.address ? "▲" : "▼"}</span></span>
+                  </button>
+                  {openPos === "pay:" + b.address && (
+                    <div className="posexp">
+                      <div className="posfield"><input type="number" inputMode="numeric" value={amtByKey[b.address] || ""} placeholder={`Amount in ${ccy}`} onChange={(e) => setAmtByKey((m) => ({ ...m, [b.address]: Number(e.target.value) }))} /></div>
+                      <div className="posacts">
+                        <button className="mini pay" onClick={() => payContact(b.address, b.name, amtByKey[b.address] || 0)} disabled={busy || !(amtByKey[b.address] > 0) || toUnits(amtByKey[b.address] || 0, ccy) > spendable}>Pay</button>
+                        <button className="mini ghost" onClick={() => { navigator.clipboard.writeText(b.address); flash("Address copied"); }}>Copy</button>
+                        <button className="mini ghost" onClick={() => removeContact(b.address)}>Remove</button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
