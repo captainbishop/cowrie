@@ -769,7 +769,7 @@ export default function CowrieApp() {
             </div>
             <div className="amtrow">{[5000, 20000, 50000, 100000].map((a) => (<button key={a} className={addAmt === a ? "on" : ""} onClick={() => setAddAmt(a)}>{amtStr(a)}</button>))}</div>
             <div className="field"><label>Amount ({ccy})</label><input type="number" value={addAmt} onChange={(e) => setAddAmt(Number(e.target.value))} /></div>
-            <button className="primary" onClick={addMoney} disabled={busy || gas === 0n}>{busy ? "Adding…" : `Add ${amtStr(addAmt)}`}</button>
+            <button className="primary" onClick={addMoney} disabled={busy}>{busy ? "Adding…" : `Add ${amtStr(addAmt)}`}</button>
             <p className="note">{gas === 0n ? "Your wallet needs a little MON for gas before you can add money." : "Demo top-up, mints test money on Monad. No real card is charged. In production this is a card or bank on-ramp."}</p>
           </div>
         )}
