@@ -479,7 +479,7 @@ export default function CowrieApp() {
       else if (it.action === "discover") { say({ who: "cowrie", text: `It all lives right here in Cowrie, ${firstName}, no leaving the app. You can grow money in the Earn vault, swap into cBTC, cETH or cGOLD, send, or pay a bill. What would you like to do?` }); }
       else if (it.action === "earn") { const units = toUnits(it.amount || 0, c); if (!it.amount || units <= 0n) { say({ who: "cowrie", text: `How much would you like to move into earning, ${firstName}?`, options: ["Earn ₦10,000", "Earn ₦50,000", "Earn ₦100,000", "Another amount"] }); } else if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} spendable right now, ${firstName}. Pick an amount up to that and I'll move it into your Earn vault.` }); } else { const h = await run("startEarning", [units], { description: `Move ${amt(it.amount)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. ${amt(it.amount)} is in your Cowrie Earn vault now, growing at 10% a year. Pull it out anytime with the Withdraw button on the home screen.` }); } }
       else if (it.action === "swap") { const found = resolveAsset((it.asset || "").toString()); if (!found) { say({ who: "cowrie", tone: "bad", text: `I don't have a pool for "${it.asset || "that"}" yet, ${firstName}. Right now you can trade ${assets.map((a) => a.symbol).join(", ") || "nothing yet"}.` }); } else if (it.direction === "sell") { await sellAsset(found.addr, it.amount || 0); } else if (!it.amount) { say({ who: "cowrie", text: `How much do you want to put into ${found.symbol}, ${firstName}?`, options: [`Buy ₦10,000 of ${found.symbol}`, `Buy ₦50,000 of ${found.symbol}`, `Buy ₦100,000 of ${found.symbol}`, "Another amount"] }); } else { await buyAsset(found.addr, it.amount); } }
-      else if (it.action === "balance") { say({ who: "cowrie", text: `${firstName}, you've got ${cfmt(spendable)} to spend${savings > 0n ? `, with ${cfmt(savings)} tucked away in savings` : ""}. ${gas === 0n ? "Your wallet needs a little MON for gas before you can move it." : `You've ${Number(formatEther(gas)).toFixed(3)} MON left for gas.`}` }); }
+      else if (it.action === "balance") { say({ who: "cowrie", text: `${firstName}, you've got ${cfmt(spendable)} to spend${savings > 0n ? `, with ${cfmt(savings)} tucked away in savings` : ""}. ${false ? "Your wallet needs a little MON for gas before you can move it." : `You've ${Number(formatEther(gas)).toFixed(3)} MON left for gas.`}` }); }
       else if (it.action === "addSubscription") {
         const s = addSub(it.service || "Subscription", it.amount || 0, it.currency, it.cycleDays, it.startedDaysAgo);
         const d = Math.ceil((new Date(s.nextISO).getTime() - Date.now()) / 86400000);
@@ -657,7 +657,7 @@ export default function CowrieApp() {
               </div>
             )}
             {!configured && <p className="hint">Add your contract addresses to web/.env.local and restart.</p>}
-            {gas === 0n && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
+            {false && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
             <div className="chips">
               {starters.map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
             </div>
@@ -770,7 +770,7 @@ export default function CowrieApp() {
             <div className="amtrow">{[5000, 20000, 50000, 100000].map((a) => (<button key={a} className={addAmt === a ? "on" : ""} onClick={() => setAddAmt(a)}>{amtStr(a)}</button>))}</div>
             <div className="field"><label>Amount ({ccy})</label><input type="number" value={addAmt} onChange={(e) => setAddAmt(Number(e.target.value))} /></div>
             <button className="primary" onClick={addMoney} disabled={busy}>{busy ? "Adding…" : `Add ${amtStr(addAmt)}`}</button>
-            <p className="note">{gas === 0n ? "Your wallet needs a little MON for gas before you can add money." : "Demo top-up, mints test money on Monad. No real card is charged. In production this is a card or bank on-ramp."}</p>
+            <p className="note">{false ? "Your wallet needs a little MON for gas before you can add money." : "Demo top-up, mints test money on Monad. No real card is charged. In production this is a card or bank on-ramp."}</p>
           </div>
         )}
         {tab === "alerts" && (
