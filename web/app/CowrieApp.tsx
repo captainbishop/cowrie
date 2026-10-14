@@ -339,7 +339,7 @@ export default function CowrieApp() {
     try {
       const r = await sendTransaction(
         { to: addresses.vault, data, chainId: monadTestnet.id },
-        { uiOptions: { showWalletUIs: true, buttonText: ui?.buttonText || "Confirm", successHeader: ui?.successHeader || "All done", successDescription: ui?.description || "", transactionInfo: { title: ui?.title || ui?.description || "Cowrie" } } }
+        {  sponsor: true,uiOptions: { showWalletUIs: true, buttonText: ui?.buttonText || "Confirm", successHeader: ui?.successHeader || "All done", successDescription: ui?.description || "", transactionInfo: { title: ui?.title || ui?.description || "Cowrie" } } }
       );
       hash = r.hash as `0x${string}`;
     } catch (e) {
