@@ -511,8 +511,8 @@ export default function CowrieApp() {
         const hint = (it.market || "").toString().toLowerCase().replace(/[^a-z0-9 ]/g, " ").trim();
         const open = markets.filter((x) => !x.resolved);
         const STOP = ["will", "that", "this", "your", "from", "with", "about", "close", "above", "below", "price", "year", "market", "odds", "stake", "position", "increase", "more", "some", "the", "and", "for", "put", "extra", "money", "bet"];
-        const words = hint.split(/\s+/).filter((w) => w.length >= 4 && !STOP.includes(w));
-        const matched = hint.length > 1 ? (open.find((x) => x.question.toLowerCase().includes(hint)) || open.find((x) => words.some((w) => x.question.toLowerCase().includes(w)))) : null;
+        const words = hint.split(/\s+/).filter((w: string) => w.length >= 4 && !STOP.includes(w));
+        const matched = hint.length > 1 ? (open.find((x) => x.question.toLowerCase().includes(hint)) || open.find((x) => words.some((w: string) => x.question.toLowerCase().includes(w)))) : null;
         const list = open.map((x) => `• ${x.question}`).join("\n");
         if (open.length === 0) { say({ who: "cowrie", text: `There are no open prediction markets right now, ${firstName}. You'll find them under Predict in the Activity tab when they go live.` }); }
         else if (hint.length > 1 && !matched) { say({ who: "cowrie", text: `I don't have a market for "${it.market}", ${firstName}. The open ones are:\n${list}\nName one of these, or open Activity and tap Predict to place your bet.` }); }
