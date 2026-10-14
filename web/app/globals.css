@@ -202,3 +202,7 @@ body { background:var(--bg-grad); background-attachment:fixed; color:var(--text)
 .muted2 { font-size:12px; color:var(--dim); }
 .chev { font-size:10px; color:var(--dim); }
 .posexp { padding:0 15px 14px; }
+/* light mode only: softer purple glow so shadows do not smudge on pale backgrounds */
+:root:not([data-theme="dark"]) .primary { box-shadow:0 6px 14px -8px rgba(74,55,214,.45); }
+:root:not([data-theme="dark"]) .primary:disabled { box-shadow:none; }
+:root:not([data-theme="dark"]) .card3d { box-shadow:0 12px 24px -16px rgba(63,47,174,.4); }
