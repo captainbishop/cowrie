@@ -13,23 +13,37 @@
 
 # Cowrie
 
-Most people never touch crypto, and the wallets are the reason. There is a seed phrase to lose, a gas token you must buy before you can move a single cent, and a 42-character address to paste where one wrong letter hands your money to a stranger. And even a normal bank app only shows you the damage after the fact. It will not stop you overspending, save on your behalf, or warn you before a subscription bills again.
+Live app: https://cowrie-amber.vercel.app
 
-Cowrie is a stablecoin wallet you talk to. You say what you want, in plain English, Pidgin, Igbo, Yoruba, Hausa or your own language, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay someone a daily allowance, grow your balance in a savings vault, or track a subscription. Every payment is checked against a scam list before it leaves your wallet. You sign in with Google, so there is no seed phrase, the fees are too small to notice, and every amount shows in your own currency.
+Cowrie began as a question I wanted an honest answer to. Can the serious infrastructure in crypto right now, Monad for speed, Privy for sign-in and Chainlink for verifiable data, survive contact with ordinary Nigerian life? Not life as a whitepaper imagines it, but the version where someone sends ₦5,000 to their mother, buys MTN airtime for a cousin, runs an ajo with three friends, and has never once wanted to see a seed phrase.
 
-It runs on Monad, where everything settles in well under a second. Fast enough that saying a thing and watching it happen feel like the same moment.
+So I built for that person first, in their language and their currency, around savings habits they already have, and let the technology prove itself there.
+
+The order matters. Facebook was a Harvard student directory before it was a global network. Amazon sold only books, in one country. M-Pesa moved money between Kenyan kiosks for years before it became the reference for mobile money everywhere. Things that last usually go narrow and deep somewhere real, then widen. Cowrie is deliberately narrow: naira on the balance by default, Pidgin in the chat, ajo on the home screen.
+
+## About
+
+Most people here never touch crypto, and wallets are the reason. There is a seed phrase to lose, a gas token you have to buy before you can move a single cent, and a 42-character address where one wrong letter hands your money to a stranger. A normal bank app is not much kinder. It shows you the damage after the fact, and it will not stop you overspending, save on your behalf, or warn you before a subscription bills again.
+
+Cowrie is a stablecoin wallet you talk to. You say what you want, in English, Pidgin, Igbo, Yoruba, Hausa or your own language, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay an allowance, grow your balance in a savings vault, swap into bitcoin, back a prediction, run an ajo circle, or have Chainlink watch a price for you. Every payment is checked against a scam list before it leaves. You sign in with Google, so there is no seed phrase, gas is sponsored, and every amount shows in your own currency.
+
+It runs on Monad, where everything settles in well under a second, fast enough that saying a thing and watching it happen feel like the same moment.
 
 ## What Cowrie does
 
 Cowrie puts a whole financial life behind one sentence. What normally takes a bank app, a bureau de change, a bills app and a crypto exchange, Cowrie does from a single chat and settles each one on-chain in under a second.
 
-**Pay and get paid.** Say "send 5,000 to Mum", "buy 500 airtime for 0803...", "pay my light bill", "request 3,000 from Tunde", or "split 30,000 three ways". Cowrie makes the payment. For a bill it asks for any missing details before a kobo moves.
+Paying and getting paid is the core. Say "send 5,000 to Mum", "buy 500 airtime for 0803...", "pay my light bill", "book a flight to Lagos", "clear my shopping cart", "request 3,000 from Tunde", or "split 30,000 three ways", and Cowrie makes the payment. For anything with missing details it asks first, so airtime gets a network and a number and a ticket gets an event and a tier before a kobo moves. People you pay often get saved by name, either from the People tab or by telling Cowrie "0x12…ab save as Mum", and from then on their name is enough. When money arrives from someone else, Cowrie reads it off the chain and tells you, so a credit shows up in your history instead of appearing silently in your balance.
 
-**Put money on rules that enforce themselves.** Say "save 10% of everything I receive", "don't let me spend more than 20,000 a day", or "give my son 2,000 a day". Those rules live on-chain inside `PolicyVault`, not on the honour system.
+Rules are the part a bank app never gives you. Say "save 10% of everything I receive", "don't let me spend more than 20,000 a day", or "give my son 2,000 a day", and those rules live inside `PolicyVault` in Solidity rather than on the honour system.
 
-**Grow and hedge without leaving the app.** Say "grow my savings" or "earn 50,000" and Cowrie moves that amount into its on-chain savings vault, which accrues yield at 10% APR (demo rate) and lets you withdraw any time. Say "swap 10,000 into bitcoin" and it trades through a constant-product AMM pool built inside the contract, giving you cBTC, cETH, or cGOLD to hold and sell back whenever. Say "bet 5,000 that Bitcoin tops $100k" and you stake on a parimutuel YES/NO market you settle and claim yourself.
+Growing money happens in the app, not somewhere else. Say "grow my savings" or "earn 50,000" and Cowrie moves that into its own on-chain savings vault, which accrues at 10% a year in this demo and lets you withdraw any time. Say "swap 10,000 into bitcoin" and it trades through a constant-product pool inside the contract, giving you cBTC, cETH or cGOLD to hold and sell back. Say "bet 5,000 that Bitcoin tops $100k" and you take a side on a parimutuel market you settle and claim yourself. Ask for a price and you get Chainlink's live number, not a guess.
 
-**Safety by default.** Every send goes through `ScamRegistry.isFlagged()` before leaving. An address is blocked when the owner flags it or when it has been reported three or more times by community members.
+Ajo is the feature I most wanted to exist. It is the rotating savings circle Nigerians already run with people they trust, rebuilt so the turn order cannot be rigged and each contribution settles on-chain. There is a countdown to the next cycle, one tap to pay the person whose turn it is, and when your turn comes Cowrie pings the rest of the group with a request each.
+
+Safety is on by default. Every send goes through `ScamRegistry.isFlagged()` before leaving, and an address is blocked once the owner flags it or three people report it.
+
+The assistant speaks like the person using it. It mirrors whatever language you wrote in, switches the moment you switch, and understands both market slang and the local kind, so "gmonad" and "abeg send 5k give my mama" both land. It remembers what matters, keeps your saved facts and contacts in view, and conversations worth keeping can be saved and reopened from the Chats tab.
 
 ## At a glance
 
@@ -38,11 +52,28 @@ Cowrie puts a whole financial life behind one sentence. What normally takes a ba
 | Chain | Monad testnet (chain ID 10143) |
 | Contracts | PolicyVault, ScamRegistry, MockUSD |
 | App | Next.js 14, Privy, viem |
-| AI assistant | Any OpenAI-compatible model; Gemini by default; a rules-based fallback if no key is set |
+| AI assistant | Qwen 3.8 (Alibaba) served on Groq's free tier, with Gemini as an automatic fallback and a rules parser if no key is set |
+| Oracle | Chainlink price feeds on Monad mainnet, read-only, powering Guardian and the Ajo draw |
 | DeFi inside Cowrie | Savings vault (10% APR), constant-product swap pools (cBTC, cETH, cGOLD), parimutuel prediction markets |
-| Everyday actions | Airtime, bills, ticket payments, money requests, bill splitting |
-| Currencies shown | NGN, USD, GHS, KES, ZAR, GBP, EUR, INR |
+| Everyday actions | Airtime, bills, flights, online shopping and carts, ticket payments, money requests, bill splitting |
+| Social saving | Ajo circles with a Chainlink-drawn turn order and a cycle countdown |
+| Currencies shown | NGN by default, plus USD, GHS, KES, ZAR, GBP, EUR, INR |
 | Languages | English, Nigerian Pidgin, Igbo, Yoruba, Hausa, French, Swahili, Arabic, Portuguese, Hindi |
+
+## Chainlink inside Cowrie
+
+Chainlink usually gets bolted onto a trading contract to read a price. Cowrie points it at two things an ordinary user actually feels.
+
+Guardian is a price watch you set in words. Say "watch bitcoin and alert me if it drops below $90,000" and Cowrie checks Chainlink's BTC/USD and ETH/USD feeds every 45 seconds, then acts the moment your level is crossed: telling you, moving money into savings, or offering the trade. The Guardian card on the home screen shows the live feed value, so the number on screen is the oracle's number rather than something Cowrie made up.
+
+Ajo uses Chainlink as a fairness beacon, which is the part I am proudest of. In a rotating savings circle the only thing people really argue about is who collects first. Cowrie decides that with a seeded shuffle whose seed is the live Chainlink BTC price at the moment the circle is created, a public figure no member controls or can predict, and the card shows the exact price it used. Nobody has to trust the organiser, and that is a tool crypto can offer a very old Nigerian habit.
+
+Chainlink's push feeds are live on Monad mainnet rather than testnet, so Cowrie reads them from mainnet with a read-only client while your money stays on testnet. The read costs no gas and needs no credentials.
+
+| Feed | Address on Monad mainnet |
+|---|---|
+| BTC / USD | `0x187efD8ba8483105f2735740D956f7CD23723deC` |
+| ETH / USD | `0x38057D0458ca56068e1A57E62D3874cA129A7A78` |
 
 ## How the contracts work
 
@@ -191,7 +222,7 @@ Cowrie today is a working consumer wallet with real on-chain DeFi inside it: a s
 
 **Protocol routing.** Because every action is a sentence first and a contract call second, Cowrie can route someone into any protocol on Monad without them knowing it is there. Staking, lending, new markets, and whatever launches next become things you ask for rather than apps you hunt down.
 
-What is live and what is planned stays honest throughout. The savings vault, swap pools, prediction market, payments, bills, caps, allowances, and auto-save in this repo are built and deployed on Monad testnet today. Credit, real liquidity routing, the on-chain resolver, and merchant rails are the roadmap.
+What is live and what is planned stays honest throughout. The savings vault, swap pools, prediction market, payments, bills, caps, allowances, auto-save, Guardian's Chainlink watches and the Ajo circles with their Chainlink-drawn order are built and running today, with every payment settling on Monad testnet. Ajo's rules are currently kept by the app rather than escrowed in a contract, so the next step there is putting the contribution schedule on-chain, where joining a circle means signing up to rules the contract enforces instead of the group chasing each other. Credit, real liquidity routing, the on-chain resolver and merchant rails are the roadmap.
 
 ## Repo layout
 

@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
-import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData } from "viem";
+import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
 import { readAllFeeds, feedKeyFor } from "../lib/chainlink";
@@ -73,6 +73,7 @@ const EXPLORER = monadTestnet.blockExplorers?.default.url || "https://testnet.mo
 
 type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[]; links?: DApp[] };
 type Tx = { hash: string; title: string; amount: string; sign: "pos" | "neg" | ""; ts: number };
+const SENT_EVENT = parseAbiItem("event Sent(address indexed from, address indexed to, uint256 amount, uint256 autoSaved)");
 type Sub = { id: string; service: string; amount: number; currency: string; cycleDays: number; startISO: string; nextISO: string };
 
 function Icon({ children, size = 22 }: { children: React.ReactNode; size?: number }) {
@@ -119,7 +120,7 @@ export default function CowrieApp() {
   const [assets, setAssets] = useState<{ addr: `0x${string}`; symbol: string; decimals: number }[]>([]);
   const [assetData, setAssetData] = useState<Record<string, { holding: bigint; value: bigint; poolCusd: bigint; poolTok: bigint }>>({});
   const [amtByKey, setAmtByKey] = useState<Record<string, number>>({});
-  const [actView, setActView] = useState<"portfolio" | "history">("portfolio");
+  const [actView, setActView] = useState<"portfolio" | "history" | "chats">("portfolio");
   const [openPos, setOpenPos] = useState<string | null>(null);
   const [requests, setRequests] = useState<{ id: string; who: string; amount: number; currency: string; note: string; ts: number }[]>([]);
   const [markets, setMarkets] = useState<{ id: number; question: string; resolved: boolean; outcome: boolean; poolYes: bigint; poolNo: bigint; yes: bigint; no: bigint }[]>([]);
@@ -127,13 +128,14 @@ export default function CowrieApp() {
   const [book, setBook] = useState<{ name: string; address: `0x${string}` }[]>([]);
   const [clPrices, setClPrices] = useState<Record<string, { price: number; at: number }>>({});
   const [guards, setGuards] = useState<{ id: string; asset: string; op: string; price: number; act: string; amount?: number; currency?: string; done?: boolean }[]>([]);
-  const [ajos, setAjos] = useState<{ id: string; name: string; amount: number; currency: string; members: { name: string; address?: string }[]; order: number[]; seedPrice: number; round: number }[]>([]);
+  const [ajos, setAjos] = useState<{ id: string; name: string; amount: number; currency: string; members: { name: string; address?: string }[]; order: number[]; seedPrice: number; round: number; cycleDays?: number; nextISO?: string; pinged?: number }[]>([]);
   const [homePanel, setHomePanel] = useState<"guardian" | "ajo" | null>(null);
   const [nickname, setNickname] = useState("");
   const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
   const [cName, setCName] = useState("");
   const [cAddr, setCAddr] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const seenIn = useRef<Set<string> | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
   const addr = (user?.wallet?.address || wallets[0]?.address) as `0x${string}` | undefined;
@@ -208,6 +210,33 @@ export default function CowrieApp() {
   }, [addr, configured, assets]);
   useEffect(() => { refresh(); const t = setInterval(refresh, 4000); return () => clearInterval(t); }, [refresh]);
   useEffect(() => { if (!configured) return; let on = true; const run = async () => { try { const p = await readAllFeeds(); if (on && Object.keys(p).length) setClPrices(p); } catch {} }; run(); const t = setInterval(run, 45000); return () => { on = false; clearInterval(t); }; }, [configured]);
+  // Money arriving from someone else: the vault emits Sent, so read those logs and
+  // surface them, otherwise a credit never shows up in the receiver's history.
+  useEffect(() => {
+    if (!addr || !configured) return;
+    let on = true;
+    const scan = async () => {
+      try {
+        const latest = await publicClient.getBlockNumber();
+        const fromBlock = latest > 9000n ? latest - 9000n : 0n;
+        const logs = await publicClient.getLogs({ address: addresses.vault, event: SENT_EVENT, args: { to: addr }, fromBlock, toBlock: "latest" });
+        if (!on || logs.length === 0) return;
+        const rows: Tx[] = logs.filter((l) => l.transactionHash).map((l) => {
+          const a = l.args as { from?: string; amount?: bigint };
+          return { hash: l.transactionHash as string, title: `Received from ${shortAddr(a.from || "")}`, amount: cfmt(a.amount || 0n), sign: "pos" as const, ts: Date.now() };
+        });
+        if (seenIn.current === null) seenIn.current = new Set(rows.map((r) => r.hash));
+        else {
+          const fresh = rows.filter((r) => !seenIn.current!.has(r.hash));
+          fresh.forEach((r) => seenIn.current!.add(r.hash));
+          if (fresh.length > 0) { flash("Money received"); say({ who: "cowrie", tone: "good", text: fresh.length === 1 ? `${fresh[0].amount} just landed in your wallet, ${firstName}. ${fresh[0].title.replace("Received from", "It came from")}.` : `${fresh.length} payments just landed, ${firstName}. They're under Activity.` }); }
+        }
+        setHistory((prev) => { const have = new Set(prev.map((h) => h.hash)); const add = rows.filter((r) => !have.has(r.hash)); if (add.length === 0) return prev; const next = [...add, ...prev].slice(0, 50); if (addr) persist("cowrie.tx." + addr, JSON.stringify(next)); return next; });
+      } catch {}
+    };
+    scan(); const t = setInterval(scan, 15000);
+    return () => { on = false; clearInterval(t); };
+  }, [addr, configured, firstName]);
   useEffect(() => {
     if (!guards.length) return;
     let changed = false;
@@ -370,13 +399,21 @@ export default function CowrieApp() {
     } catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
     finally { setBusy(false); }
   }
-  function advanceAjo(id: string) { setAjos((prev) => { const n = prev.map((a) => (a.id === id ? { ...a, round: a.round + 1 } : a)); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; }); }
+  function advanceAjo(id: string) { setAjos((prev) => { const n = prev.map((a) => (a.id === id ? { ...a, round: a.round + 1, nextISO: new Date(Date.now() + (a.cycleDays || 30) * 86400000).toISOString(), pinged: 0 } : a)); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; }); }
+  function collectPot(id: string) {
+    const c = ajos.find((a) => a.id === id); if (!c) return;
+    const others = c.members.filter((m, i) => i !== 0 || false).filter((m) => m.name !== (firstName || "You"));
+    others.forEach((m) => addRequest(m.name, c.amount, c.currency, `${c.name} ajo share`));
+    setAjos((prev) => { const n = prev.map((a) => (a.id === id ? { ...a, pinged: Date.now() } : a)); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; });
+    say({ who: "cowrie", tone: "good", text: `It's your turn in "${c.name}", ${firstName}. I've put a request for ${amtStr(c.amount, c.currency)} to each of the other ${others.length} ${others.length === 1 ? "member" : "members"}, so they know to pay you. They're under People, tap Copy to nudge anyone directly, and I'll tell you the moment money lands. Tap Collected once everyone has paid.` });
+    flash(`Pinged ${others.length}`);
+  }
   function removeAjo(id: string) { setAjos((prev) => { const n = prev.filter((a) => a.id !== id); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; }); }
   async function payShare(id: string) {
     const c = ajos.find((a) => a.id === id); if (!c || busy) return;
     const recipient = c.members[c.order[c.round % c.members.length]];
     const isYou = recipient.name === (firstName || "You") || (!!recipient.address && !!addr && recipient.address.toLowerCase() === addr.toLowerCase());
-    if (isYou) { say({ who: "cowrie", tone: "good", text: `It's your turn this cycle, ${firstName}, so you collect the pot. I'll move the circle to the next person.` }); advanceAjo(id); return; }
+    if (isYou) { collectPot(id); return; }
     if (!recipient.address) { say({ who: "cowrie", text: `I don't have ${recipient.name}'s wallet yet, ${firstName}. Save it under People and I'll pay their turn straight away.` }); return; }
     setBusy(true);
     try {
@@ -526,6 +563,18 @@ export default function CowrieApp() {
         else if (!nmRaw) { say({ who: "cowrie", text: `What name should I save ${shortAddr(a)} under, ${firstName}?` }); }
         else { const nm = nmRaw[0].toUpperCase() + nmRaw.slice(1); saveContact(nm, a.toLowerCase()); say({ who: "cowrie", tone: "good", text: `Saved ${nm} to your People list, ${firstName}. You can pay them by name now, just say "send 5,000 to ${nmRaw}". Tap People to see them.` }); }
       }
+      else if (it.action === "price") {
+        const key = feedKeyFor(it.asset || "bitcoin") || "BTC";
+        const p = clPrices[key]?.price;
+        const per = (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd;
+        if (!p) say({ who: "cowrie", text: `I'm still reaching Chainlink for the ${key} price, ${firstName}. Give it a few seconds and ask again.` });
+        else say({ who: "cowrie", text: `${key} is $${Math.round(p).toLocaleString()} right now, ${firstName}, read straight off Chainlink's on-chain feed, about ${amtStr(Math.round(p * per))}. Want me to keep an eye on a level for you?`, options: [`Watch ${key} below ${Math.round(p * 0.9).toLocaleString()}`, `Buy ${key === "BTC" ? "cBTC" : "cETH"}`] });
+      }
+      else if (it.action === "setName") {
+        const raw = (it.name || "").toString().trim().slice(0, 24);
+        if (!raw) say({ who: "cowrie", text: "No problem, what should I call you?" });
+        else { const nm = raw[0].toUpperCase() + raw.slice(1); setNick(nm); say({ who: "cowrie", tone: "good", text: `Got it, I'll call you ${nm} from now on. You can change that any time in Settings.` }); }
+      }
       else if (it.action === "guardian") {
         const key = feedKeyFor(it.asset || "");
         if (!key) { say({ who: "cowrie", text: `Guardian watches Bitcoin and Ethereum live on Chainlink, ${firstName}. Which one should I watch, and at what price?` }); }
@@ -548,8 +597,10 @@ export default function CowrieApp() {
           const members = [{ name: firstName || "You", address: addr as string | undefined }, ...names.map((nm: string) => { const b = book.find((x) => x.name.toLowerCase() === nm.toLowerCase() || x.name.toLowerCase().startsWith(nm.toLowerCase())); return { name: nm[0].toUpperCase() + nm.slice(1), address: b?.address as string | undefined }; })];
           const seedP = clPrices.BTC?.price || clPrices.ETH?.price || 0;
           const seed = Math.floor((seedP || (Date.now() % 100000)) * 1000);
-          const circle = { id: Date.now().toString(36), name: (it.name || "My Ajo").toString(), amount: amt, currency: cur, members, order: seededOrder(members.length, seed), seedPrice: seedP, round: 0 };
+          const cyc = /\bweek/i.test(text) ? 7 : /\bfortnight|two weeks|2 weeks/i.test(text) ? 14 : 30;
+          const circle = { id: Date.now().toString(36), name: (it.name || "My Ajo").toString(), amount: amt, currency: cur, members, order: seededOrder(members.length, seed), seedPrice: seedP, round: 0, cycleDays: cyc, nextISO: new Date(Date.now() + cyc * 86400000).toISOString(), pinged: 0 };
           const next = [...ajos, circle]; setAjos(next); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(next));
+          addReminder(`Ajo: ${circle.name}`, amt, cur, cyc, cyc);
           setHomePanel("ajo"); setTab("home");
           const first = circle.members[circle.order[0]].name;
           say({ who: "cowrie", tone: "good", text: `Your ajo "${circle.name}" is live, ${firstName}: ${members.length} people, ${amtStr(amt, cur)} each per cycle. I drew the turn order from the live Chainlink BTC price${seedP ? ` ($${Math.round(seedP).toLocaleString()})` : ""}, so nobody can rig who collects first. ${first} is up first. It's on your Home under Ajo circle.` });
@@ -632,8 +683,10 @@ export default function CowrieApp() {
               <button className={"feat" + (homePanel === "guardian" ? " on" : "")} onClick={() => setHomePanel(homePanel === "guardian" ? null : "guardian")}><span className="fl">Guardian</span><span className="fv">{clPrices.BTC ? `BTC $${(clPrices.BTC.price / 1000).toFixed(1)}k` : "live via Chainlink"}</span></button>
               <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{ajos.length ? `${ajos.length} active` : "fair, via Chainlink"}</span></button>
             </div>
+            {homePanel && <button className="sheetbg" aria-label="Close panel" onClick={() => setHomePanel(null)} />}
             {homePanel === "guardian" && (
-              <div className="hpanel">
+              <div className="sheet">
+                <div className="sheethead"><span>Guardian</span><button className="xbtn" aria-label="Close" onClick={() => setHomePanel(null)}>✕</button></div>
                 <div className="poshead">Guardian <span style={{ color: "var(--brass)", fontWeight: 700 }}>· live via Chainlink</span></div>
                 <section className="dashcard">{Object.keys(clPrices).length === 0 ? <div className="ds">Connecting to Chainlink price feeds…</div> : <div className="ds" style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>{clPrices.BTC && <span><b style={{ color: "var(--text)" }}>BTC</b> ${Math.round(clPrices.BTC.price).toLocaleString()}</span>}{clPrices.ETH && <span><b style={{ color: "var(--text)" }}>ETH</b> ${Math.round(clPrices.ETH.price).toLocaleString()}</span>}<span className="muted2">verified by Chainlink</span></div>}</section>
                 {guards.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Say &ldquo;watch bitcoin and alert me if it drops below $90,000&rdquo;. Chainlink is the eyes.</p> : guards.map((g) => (
@@ -642,15 +695,25 @@ export default function CowrieApp() {
               </div>
             )}
             {homePanel === "ajo" && (
-              <div className="hpanel">
+              <div className="sheet">
+                <div className="sheethead"><span>Ajo circle</span><button className="xbtn" aria-label="Close" onClick={() => setHomePanel(null)}>✕</button></div>
                 <div className="poshead">Ajo circle <span style={{ color: "var(--brass)", fontWeight: 700 }}>· fair draw via Chainlink</span></div>
-                {ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; return (
+                {ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; const mine = recipient.name === (firstName || "You"); const daysLeft = c.nextISO ? Math.ceil((new Date(c.nextISO).getTime() - Date.now()) / 86400000) : null; const due = daysLeft !== null && daysLeft <= 0; return (
                   <div className="pcard" key={c.id}>
                     <div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{c.name}</b><small>{amtStr(c.amount, c.currency)} each · {c.members.length} people · cycle {Math.min(c.round + 1, c.members.length)}/{c.members.length}</small></span><button className="iconbtn" aria-label="Remove" onClick={() => removeAjo(c.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></div>
                     <div className="posexp">
+                      {!done && daysLeft !== null && (<div className={"ajodue" + (due ? " now" : "")}>{due ? "Due now" : `Next cycle in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`}<span>every {c.cycleDays || 30} days</span></div>)}
                       <div className="ds" style={{ marginBottom: 6 }}>Turn order <span style={{ color: "var(--brass)" }}>· drawn from Chainlink{c.seedPrice ? ` BTC $${Math.round(c.seedPrice).toLocaleString()}` : ""}</span></div>
                       <div className="ajorder">{c.order.map((idx, pos) => (<span key={pos} className={"ajochip" + (!done && pos === turn ? " on" : "")}>{pos + 1}. {c.members[idx].name}</span>))}</div>
-                      {done ? <span className="muted2">Circle complete, everyone has collected.</span> : <div className="posacts"><button className="mini pay" onClick={() => payShare(c.id)} disabled={busy}>{recipient.name === (firstName || "You") ? "Your turn, collect the pot" : `Pay ${amtStr(c.amount, c.currency)} to ${recipient.name}`}</button></div>}
+                      {done ? <span className="muted2">Circle complete, everyone has collected.</span> : mine ? (
+                        <>
+                          <div className="ds" style={{ marginBottom: 6 }}>{c.pinged ? `Pinged the group, waiting on ${c.members.length - 1} ${c.members.length - 1 === 1 ? "payment" : "payments"}. I'll tell you as each one lands.` : `You collect ${amtStr(c.amount * (c.members.length - 1), c.currency)} this cycle. Ping the group to ask for their shares.`}</div>
+                          <div className="posacts">
+                            <button className="mini pay" onClick={() => collectPot(c.id)} disabled={busy}>{c.pinged ? "Ping again" : `Collect ${amtStr(c.amount * (c.members.length - 1), c.currency)}`}</button>
+                            <button className="mini ghost" onClick={() => advanceAjo(c.id)} disabled={busy}>Collected, next cycle</button>
+                          </div>
+                        </>
+                      ) : <div className="posacts"><button className="mini pay" onClick={() => payShare(c.id)} disabled={busy}>Pay {amtStr(c.amount, c.currency)} to {recipient.name}</button></div>}
                     </div>
                   </div>
                 ); })}
@@ -682,7 +745,7 @@ export default function CowrieApp() {
           <div className="panel">
             <div className="acthead">
               <h2 className="ptitle">Activity</h2>
-              <div className="seg"><button className={actView === "portfolio" ? "on" : ""} onClick={() => setActView("portfolio")}>Portfolio</button><button className={actView === "history" ? "on" : ""} onClick={() => setActView("history")}>History</button></div>
+              <div className="seg"><button className={actView === "portfolio" ? "on" : ""} onClick={() => setActView("portfolio")}>Portfolio</button><button className={actView === "history" ? "on" : ""} onClick={() => setActView("history")}>Payments</button><button className={actView === "chats" ? "on" : ""} onClick={() => setActView("chats")}>Chats</button></div>
             </div>
             {actView === "portfolio" ? (
               <>
@@ -750,6 +813,18 @@ export default function CowrieApp() {
                   );
                 })}
               </>
+            ) : actView === "chats" ? (
+              <>
+                <div className="poshead">Saved chats</div>
+                {thread.length > 1 && <button className="mini pay" style={{ marginBottom: 10 }} onClick={saveSession}>Save this chat and start fresh</button>}
+                {sessions.length === 0 ? <p className="muted">Nothing saved yet. When a conversation is worth keeping, save it here and you can reopen it any time.</p> : sessions.map((s) => (
+                  <div className="chatrow" key={s.id}>
+                    <div className="mid"><b>{s.title}</b><small>{new Date(s.ts).toLocaleString()} · {s.msgs.length} messages</small></div>
+                    <button className="mini ghost" onClick={() => openSession(s.id)}>Open</button>
+                    <button className="iconbtn" aria-label="Delete" onClick={() => deleteSession(s.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button>
+                  </div>
+                ))}
+              </>
             ) : (
               history.length === 0 ? <p className="muted">No transactions yet. Anything you do with Cowrie shows up here, with a link to the Monad explorer.</p> : (
                 <div className="list">
@@ -794,6 +869,12 @@ export default function CowrieApp() {
         {tab === "settings" && (
           <div className="panel">
             <h2 className="ptitle">Settings</h2>
+            <div className="srow"><div style={{ minWidth: 0 }}><div className="lab">{acctName || firstName}</div><div className="sub">{acctEmail ? `${acctEmail} · signed in with Google` : "signed in"}</div></div>
+              <div className="ava" aria-hidden="true">{(acctName || firstName || "?").slice(0, 1).toUpperCase()}</div>
+            </div>
+            <div className="srow"><div style={{ minWidth: 0 }}><div className="lab">What Cowrie calls you</div><div className="sub">{nickname ? `Using "${nickname}"` : `Using "${firstName}" from your account`}</div></div>
+              <input className="nickin" value={nickname} placeholder={firstName} onChange={(e) => setNick(e.target.value.slice(0, 24))} aria-label="Preferred name" />
+            </div>
             <div className="srow"><div><div className="lab">Appearance</div><div className="sub">Light, dark, or match your device</div></div>
               <div className="seg">{["light", "dark", "system"].map((t) => (<button key={t} className={theme === t ? "on" : ""} onClick={() => changeTheme(t)}>{t[0].toUpperCase() + t.slice(1)}</button>))}</div>
             </div>
