@@ -1,32 +1,45 @@
 import {
 	cre,
 	getNetwork,
+	bytesToHex,
+	hexToBase64,
 	type Runtime,
 	type CronPayload,
 } from '@chainlink/cre-sdk';
-import { formatUnits, type Address } from 'viem';
+import { formatUnits, encodeAbiParameters, parseAbiParameters, type Address } from 'viem';
 import { z } from 'zod';
 import { PriceFeedAggregator } from '../contracts/evm/ts/generated/PriceFeedAggregator';
+import { AjoCircle } from '../contracts/evm/ts/generated/AjoCircle';
 
 // ---------- Config ----------
 
 export const configSchema = z.object({
 	schedule: z.string(),
-	chainName: z.string(),
+	mainnetChain: z.string(), // where the Chainlink BTC/USD feed lives
+	testnetChain: z.string(), // where the Ajo contracts live
 	btcFeed: z.string(),
-	circleName: z.string(),
-	members: z.array(z.string()),
+	ajoCircle: z.string(),
+	ajoKeeper: z.string(),
+	gasLimit: z.string(),
 });
 
 type Config = z.infer<typeof configSchema>;
 
+// Ajo circle status values, matching the contract's enum.
+const STATUS_FULL = 1;
+const STATUS_ACTIVE = 2;
+
+// Report actions understood by the AjoKeeper contract.
+const ACTION_SETTLE = 1;
+const ACTION_SET_ORDER = 2;
+
 // ---------- Helpers ----------
 
-function getEvmClient(chainName: string) {
+function getEvmClient(chainName: string, isTestnet: boolean) {
 	const net = getNetwork({
 		chainFamily: 'evm',
 		chainSelectorName: chainName,
-		isTestnet: false,
+		isTestnet,
 	});
 	if (!net) throw new Error(`Network not found for chain name: ${chainName}`);
 	return new cre.capabilities.EVMClient(net.chainSelector.selector);
@@ -50,32 +63,96 @@ function seededOrder(n: number, seed: number): number[] {
 	return a;
 }
 
+// Sign a report and deliver it to the AjoKeeper through Chainlink's forwarder.
+function sendReport(
+	runtime: Runtime<Config>,
+	client: InstanceType<typeof cre.capabilities.EVMClient>,
+	payload: `0x${string}`,
+): string {
+	const report = runtime
+		.report({
+			encodedPayload: hexToBase64(payload),
+			encoderName: 'evm',
+			signingAlgo: 'ecdsa',
+			hashingAlgo: 'keccak256',
+		})
+		.result();
+
+	const res = client
+		.writeReport(runtime, {
+			receiver: runtime.config.ajoKeeper,
+			report,
+			gasConfig: { gasLimit: runtime.config.gasLimit },
+		})
+		.result();
+
+	return bytesToHex(res.txHash || new Uint8Array(32));
+}
+
+const reportShape = parseAbiParameters('uint8 action, uint256 id, address[] order, uint256 seed');
+
 // ---------- Handler ----------
 
 export function onCron(runtime: Runtime<Config>, _payload: CronPayload): string {
-	const evmClient = getEvmClient(runtime.config.chainName);
-	const aggregator = new PriceFeedAggregator(evmClient, runtime.config.btcFeed as Address);
+	const cfg = runtime.config;
+	const testClient = getEvmClient(cfg.testnetChain, true);
+	const ajo = new AjoCircle(testClient, cfg.ajoCircle as Address);
 
-	const decimals = aggregator.decimals(runtime);
-	const answer = aggregator.latestAnswer(runtime);
-	const price = formatUnits(answer, decimals);
+	const count = Number(ajo.circleCount(runtime));
+	runtime.log(`Ajo circles on-chain: ${count}`);
 
-	// Seed = price x 1000, as a whole number, using exact integer maths.
-	const seed = Number((answer * BigInt(1000)) / (BigInt(10) ** BigInt(decimals)));
+	const done: { circle: number; action: string; tx: string }[] = [];
 
-	const members = runtime.config.members;
-	const order = seededOrder(members.length, seed);
-	const payoutOrder = order.map((idx, pos) => ({ round: pos + 1, member: members[idx] }));
+	// The live Chainlink BTC price is read once, and only if a draw is needed.
+	let seedInfo: { seed: number; price: string } | null = null;
+	const getSeed = () => {
+		if (seedInfo) return seedInfo;
+		const mainClient = getEvmClient(cfg.mainnetChain, false);
+		const feed = new PriceFeedAggregator(mainClient, cfg.btcFeed as Address);
+		const decimals = feed.decimals(runtime);
+		const answer = feed.latestAnswer(runtime);
+		seedInfo = {
+			price: formatUnits(answer, decimals),
+			seed: Number((answer * BigInt(1000)) / (BigInt(10) ** BigInt(decimals))),
+		};
+		runtime.log(`Chainlink BTC/USD on ${cfg.mainnetChain}: ${seedInfo.price} (seed ${seedInfo.seed})`);
+		return seedInfo;
+	};
 
-	runtime.log(`Ajo draw | circle="${runtime.config.circleName}" btcPrice=${price} seed=${seed}`);
-	payoutOrder.forEach((p) => runtime.log(`Round ${p.round}: ${p.member}`));
+	for (let n = 1; n <= count; n++) {
+		const id = BigInt(n);
+		try {
+			const circle = ajo.getCircle(runtime, id);
+			const status = Number(circle.status);
 
-	return JSON.stringify({
-		circle: runtime.config.circleName,
-		btcPrice: price,
-		seed,
-		payoutOrder,
-	});
+			if (status === STATUS_FULL) {
+				// Circle is full and waiting for its fair draw.
+				const members = ajo.getMembers(runtime, id);
+				const { seed } = getSeed();
+				const order = seededOrder(members.length, seed).map((i) => members[i]);
+				runtime.log(`Circle ${n}: drawing payout order for ${members.length} members`);
+				order.forEach((m, pos) => runtime.log(`Circle ${n} round ${pos + 1}: ${m}`));
+
+				const payload = encodeAbiParameters(reportShape, [ACTION_SET_ORDER, id, [...order], BigInt(seed)]);
+				const tx = sendReport(runtime, testClient, payload);
+				runtime.log(`Circle ${n}: draw recorded, tx ${tx}`);
+				done.push({ circle: n, action: 'draw', tx });
+			} else if (status === STATUS_ACTIVE && ajo.isDue(runtime, id)) {
+				// A round's timer has ended: settle it so the pot is paid out.
+				runtime.log(`Circle ${n}: round timer ended, settling`);
+				const payload = encodeAbiParameters(reportShape, [ACTION_SETTLE, id, [], BigInt(0)]);
+				const tx = sendReport(runtime, testClient, payload);
+				runtime.log(`Circle ${n}: round settled, tx ${tx}`);
+				done.push({ circle: n, action: 'settle', tx });
+			} else {
+				runtime.log(`Circle ${n}: nothing to do (status ${status})`);
+			}
+		} catch (e) {
+			runtime.log(`Circle ${n}: skipped, ${String(e)}`);
+		}
+	}
+
+	return JSON.stringify({ circles: count, actions: done });
 }
 
 // ---------- Init ----------

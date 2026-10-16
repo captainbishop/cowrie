@@ -1,7 +1,9 @@
 {
-  "schedule": "0 */10 * * * *",
-  "chainName": "monad-mainnet",
+  "schedule": "0 */1 * * * *",
+  "mainnetChain": "monad-mainnet",
+  "testnetChain": "monad-testnet",
   "btcFeed": "0x187efD8ba8483105f2735740D956f7CD23723deC",
-  "circleName": "Family Ajo",
-  "members": ["Johnson", "Mum", "Tunde", "Ada"]
+  "ajoCircle": "0xD0768572FD9bd52087Bc0aB4ff5563679efDd615",
+  "ajoKeeper": "0xd492e2A9E579a41fD51448E353D628eEd2cB5687",
+  "gasLimit": "2000000"
 }
