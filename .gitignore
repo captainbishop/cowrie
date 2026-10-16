@@ -11,3 +11,6 @@ typechain-types
 web/node_modules
 web/.next
 .cre_build_tmp.js
+.demo-wallets.json
+.demo-wallets.json
+.demo-phase

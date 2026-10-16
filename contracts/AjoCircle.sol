@@ -22,7 +22,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         uint256 deposit;
         uint64 period;
         uint64 joinDeadline;
-        uint64 startTime;
+        uint64 roundStart;
         uint8 maxMembers;
         uint8 round;
         Status status;
@@ -141,7 +141,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         c.order = order;
         c.seed = seed;
         c.status = Status.Active;
-        c.startTime = uint64(block.timestamp);
+        c.roundStart = uint64(block.timestamp);
         c.round = 1;
         emit OrderSet(id, seed, order);
     }
@@ -151,7 +151,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         Circle storage c = circles[id];
         require(c.status == Status.Active, "not active");
         require(isMember[id][msg.sender], "not a member");
-        require(block.timestamp < roundEnd(id, c.round), "round ended");
+        require(block.timestamp < roundEnd(id), "round ended");
         require(!paid[id][c.round][msg.sender], "already paid");
 
         paid[id][c.round][msg.sender] = true;
@@ -164,7 +164,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         Circle storage c = circles[id];
         require(c.status == Status.Active, "not active");
         uint8 r = c.round;
-        require(block.timestamp >= roundEnd(id, r), "round not over");
+        require(block.timestamp >= roundEnd(id), "round not over");
 
         uint256 pot;
         uint256 n = c.members.length;
@@ -187,6 +187,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
             c.status = Status.Completed;
         } else {
             c.round = r + 1;
+            c.roundStart = uint64(block.timestamp); // next window starts now
         }
 
         token.safeTransfer(collector, pot);
@@ -217,15 +218,15 @@ contract AjoCircle is ReentrancyGuard, Ownable {
 
     // ---------- Views ----------
 
-    function roundEnd(uint256 id, uint8 round) public view returns (uint256) {
+    function roundEnd(uint256 id) public view returns (uint256) {
         Circle storage c = circles[id];
-        return uint256(c.startTime) + uint256(round) * uint256(c.period);
+        return uint256(c.roundStart) + uint256(c.period);
     }
 
     /// @notice True when a round's timer has ended and settleRound can be called.
     function isDue(uint256 id) external view exists(id) returns (bool) {
         Circle storage c = circles[id];
-        return c.status == Status.Active && block.timestamp >= roundEnd(id, c.round);
+        return c.status == Status.Active && block.timestamp >= roundEnd(id);
     }
 
     function getCircle(uint256 id) external view exists(id) returns (Circle memory) {

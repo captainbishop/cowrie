@@ -36,8 +36,8 @@ async function startCircle(ctx, depositMult = 2n) {
   return { id, order };
 }
 
-async function roundEnd(ctx, id, round) {
-  return Number(await ctx.ajo.roundEnd(id, round));
+async function roundEnd(ctx, id) {
+  return Number(await ctx.ajo.roundEnd(id));
 }
 
 describe("AjoCircle", () => {
@@ -143,5 +143,21 @@ describe("AjoCircle", () => {
     const before = await token.balanceOf(members[0].address);
     await ajo.connect(members[0]).withdrawDeposit(1);
     expect((await token.balanceOf(members[0].address)) - before).to.equal(2n * C);
+  });
+
+  it("a late keeper does not shorten the next round's payment window", async () => {
+    const ctx = await loadFixture(deploy);
+    const { ajo, members } = ctx;
+    const { id } = await startCircle(ctx);
+
+    for (const m of members) await ajo.connect(m).contribute(id);
+    // the keeper is very late: settle long after the round ended
+    await time.increaseTo((await roundEnd(ctx, id)) + 5000);
+    await ajo.settleRound(id);
+
+    // round 2's window starts at settlement, so members can still pay
+    for (const m of members) await ajo.connect(m).contribute(id);
+    expect(await ajo.paid(id, 2, members[0].address)).to.equal(true);
+    expect(await ajo.strikes(id, members[0].address)).to.equal(0);
   });
 });

@@ -49,7 +49,7 @@ describe("AjoKeeper", () => {
     // too early: the settle report is rejected
     await expect(keeper.connect(fwd).onReport("0x", report(1, 1, [], 0))).to.be.revertedWith("round not over");
 
-    await time.increaseTo(Number(await ajo.roundEnd(1, 1)));
+    await time.increaseTo(Number(await ajo.roundEnd(1)));
     const before = await token.balanceOf(order[0].address);
     await keeper.connect(fwd).onReport("0x", report(1, 1, [], 0));
     expect((await token.balanceOf(order[0].address)) - before).to.equal(4n * C);
