@@ -13,6 +13,13 @@ const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
   ZAR: { symbol: "R", perUsd: 18.2 }, GBP: { symbol: "£", perUsd: 0.79 },
   EUR: { symbol: "€", perUsd: 0.92 }, INR: { symbol: "₹", perUsd: 83 },
 };
+function agoStr(ts: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
+}
 // Fair, unriggable payout order for an Ajo circle, seeded by a live Chainlink price (a public beacon no member controls).
 function seededOrder(n: number, seed: number): number[] {
   let s = (seed >>> 0) || 1;
@@ -132,6 +139,9 @@ export default function CowrieApp() {
   const [homePanel, setHomePanel] = useState<"guardian" | "ajo" | null>(null);
   const [nickname, setNickname] = useState("");
   const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const [notes, setNotes] = useState<{ id: string; title: string; body: string; ts: number; read?: boolean }[]>([]);
+  const curSid = useRef<string>(Date.now().toString(36));
   const [cName, setCName] = useState("");
   const [cAddr, setCAddr] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -229,7 +239,7 @@ export default function CowrieApp() {
         else {
           const fresh = rows.filter((r) => !seenIn.current!.has(r.hash));
           fresh.forEach((r) => seenIn.current!.add(r.hash));
-          if (fresh.length > 0) { flash("Money received"); say({ who: "cowrie", tone: "good", text: fresh.length === 1 ? `${fresh[0].amount} just landed in your wallet, ${firstName}. ${fresh[0].title.replace("Received from", "It came from")}.` : `${fresh.length} payments just landed, ${firstName}. They're under Activity.` }); }
+          if (fresh.length > 0) { flash("Money received"); fresh.forEach((r) => notify("Money received", `${r.amount} ${r.title.replace("Received from", "from")}.`, "in-" + r.hash)); say({ who: "cowrie", tone: "good", text: fresh.length === 1 ? `${fresh[0].amount} just landed in your wallet, ${firstName}. ${fresh[0].title.replace("Received from", "It came from")}.` : `${fresh.length} payments just landed, ${firstName}. They're under Activity.` }); }
         }
         setHistory((prev) => { const have = new Set(prev.map((h) => h.hash)); const add = rows.filter((r) => !have.has(r.hash)); if (add.length === 0) return prev; const next = [...add, ...prev].slice(0, 50); if (addr) persist("cowrie.tx." + addr, JSON.stringify(next)); return next; });
       } catch {}
@@ -237,6 +247,31 @@ export default function CowrieApp() {
     scan(); const t = setInterval(scan, 15000);
     return () => { on = false; clearInterval(t); };
   }, [addr, configured, firstName]);
+  // Every conversation saves itself, keyed by the current session id, like a normal chat app.
+  useEffect(() => {
+    if (!addr || !thread.some((m) => m.who === "you")) return;
+    const t = setTimeout(() => {
+      setSessions((prev) => {
+        const title = (thread.find((m) => m.who === "you")?.text || "Conversation").slice(0, 52);
+        const s = { id: curSid.current, title, ts: Date.now(), msgs: thread.slice(-80).map(({ who, text, tone }) => ({ who, text, tone })) };
+        const next = [s, ...prev.filter((x) => x.id !== s.id)].slice(0, 30);
+        persist("cowrie.sessions." + addr, JSON.stringify(next));
+        return next;
+      });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [thread, addr]);
+  useEffect(() => {
+    ajos.forEach((c) => {
+      if (!c.nextISO || c.round >= c.members.length) return;
+      if (new Date(c.nextISO).getTime() <= Date.now()) notify(`Ajo "${c.name}" is due`, `Cycle ${c.round + 1} of ${c.members.length} is due now. Open the Ajo card on Home to pay or collect.`, `ajo-due-${c.id}-${c.round}`);
+    });
+  }, [ajos]);
+  useEffect(() => {
+    if (tab !== "alerts" || !notes.some((n) => !n.read)) return;
+    const t = setTimeout(() => setNotes((prev) => { const next = prev.map((n) => ({ ...n, read: true })); if (addr) persist("cowrie.notes." + addr, JSON.stringify(next)); return next; }), 1500);
+    return () => clearTimeout(t);
+  }, [tab, notes, addr]);
   useEffect(() => {
     if (!guards.length) return;
     let changed = false;
@@ -247,6 +282,7 @@ export default function CowrieApp() {
       if (!hit) return g;
       changed = true;
       flash(`${g.asset} hit $${g.price.toLocaleString()}`);
+      notify(`Guardian: ${g.asset} ${g.op} $${g.price.toLocaleString()}`, `Chainlink has ${g.asset} at $${Math.round(p).toLocaleString()}.`, "g-" + g.id);
       const head = `${g.asset} just went ${g.op} $${g.price.toLocaleString()}, ${firstName}. Chainlink has it at $${Math.round(p).toLocaleString()}.`;
       if (g.act === "notify") say({ who: "cowrie", tone: "good", text: `${head} You asked me to flag it, so here it is.` });
       else if (g.act === "protect") say({ who: "cowrie", tone: "good", text: `${head} You wanted your savings moved to safety, tap to grow them in the vault.`, options: ["Grow my savings", "Not now"] });
@@ -284,6 +320,7 @@ export default function CowrieApp() {
       const aj = localStorage.getItem("cowrie.ajo." + addr); setAjos(aj ? JSON.parse(aj) : []);
       setNickname(localStorage.getItem("cowrie.nick." + addr) || "");
       const ss = localStorage.getItem("cowrie.sessions." + addr); setSessions(ss ? JSON.parse(ss) : []);
+      const nt = localStorage.getItem("cowrie.notes." + addr); setNotes(nt ? JSON.parse(nt) : []);
       const bk = JSON.parse(localStorage.getItem("cowrie.book." + addr) || "[]"); const have = new Set(bk.map((x: { address: string }) => x.address.toLowerCase())); let changed = false;
       for (const fact of (Array.isArray(fArr) ? fArr : [])) { const m = String(fact).match(/([A-Za-z][A-Za-z0-9 ._-]{0,24}?)(?:'s)?\s*(?:=|:|is|address|wallet|at)\s*.{0,14}?(0x[a-fA-F0-9]{40})/i); if (m && !have.has(m[2].toLowerCase())) { const nm = m[1].trim().replace(/\b(my|the|a|contact|wallet|address|save|add|as|is)\b/gi, "").trim(); if (nm) { bk.push({ name: nm[0].toUpperCase() + nm.slice(1), address: m[2] }); have.add(m[2].toLowerCase()); changed = true; } } }
       if (changed) { persist("cowrie.book." + addr, JSON.stringify(bk)); setBook(bk); }
@@ -304,17 +341,41 @@ export default function CowrieApp() {
   const saveContact = (name: string, address: string) => setBook((prev) => { const next = [...prev.filter((x) => x.address.toLowerCase() !== address.toLowerCase()), { name, address: address as `0x${string}` }]; if (addr) persist("cowrie.book." + addr, JSON.stringify(next)); return next; });
   const removeContact = (address: string) => setBook((prev) => { const next = prev.filter((x) => x.address !== address); if (addr) persist("cowrie.book." + addr, JSON.stringify(next)); return next; });
   const setNick = (n: string) => { setNickname(n); if (addr) persist("cowrie.nick." + addr, n); };
-  function saveSession() {
-    if (thread.length < 2) { flash("Nothing to save yet"); return; }
-    const firstUser = thread.find((m) => m.who === "you")?.text || "Conversation";
-    const s = { id: Date.now().toString(36), title: firstUser.slice(0, 48), ts: Date.now(), msgs: thread };
-    const next = [s, ...sessions].slice(0, 30);
-    setSessions(next); if (addr) persist("cowrie.sessions." + addr, JSON.stringify(next));
-    setThread([]); flash("Chat saved to history");
+  function newChat() {
+    curSid.current = Date.now().toString(36);
+    setThread([{ who: "cowrie", text: `Fresh chat, ${firstName}. Your last one is saved under Activity, Chats. What should we do?` }]);
+    setExpanded(false); setTab("home");
   }
   function openSession(id: string) {
     const s = sessions.find((x) => x.id === id); if (!s) return;
-    setThread(s.msgs as typeof thread); setTab("home"); flash("Chat reopened");
+    curSid.current = s.id; setThread(s.msgs as typeof thread); setTab("home"); flash("Chat reopened");
+  }
+  const notify = (title: string, body: string, id?: string) => setNotes((prev) => {
+    const nid = id || Date.now().toString(36) + Math.random().toString(16).slice(2, 5);
+    if (prev.some((n) => n.id === nid)) return prev;
+    const next = [{ id: nid, title, body, ts: Date.now() }, ...prev].slice(0, 40);
+    if (addr) persist("cowrie.notes." + addr, JSON.stringify(next));
+    return next;
+  });
+  const unread = notes.filter((n) => !n.read).length;
+  const hasChat = thread.some((m) => m.who === "you");
+  const heroOpen = expanded || !hasChat;
+  const expandAt = useRef(0);
+  const openHero = () => { expandAt.current = Date.now(); setExpanded(true); };
+  async function sellPct(a: string, pct: number) {
+    const d = assetData[a];
+    if (busy || !d || d.holding <= 0n) { flash("Nothing to sell"); return; }
+    const tokIn = pct >= 100 ? d.holding : (d.holding * BigInt(pct)) / 100n;
+    const val = pct >= 100 ? d.value : (d.value * BigInt(pct)) / 100n;
+    if (tokIn <= 0n) return;
+    setBusy(true);
+    try {
+      const h = await run("swapTokenForCusd", [a, tokIn], { description: `Sell ${pct}% of your ${symOf(a)}, about ${cfmt(val)}.`, successHeader: "Sold", title: `Sell ${pct}% of ${symOf(a)}`, buttonText: `Sell ${pct}%` });
+      logTx({ hash: h, title: `Sold ${pct}% of ${symOf(a)}`, amount: cfmt(val), sign: "pos" });
+      say({ who: "cowrie", tone: "good", text: `Sold ${pct === 100 ? "all" : pct + "%"} of your ${symOf(a)}, about ${cfmt(val)} back to spendable, ${firstName}.` });
+      await refresh();
+    } catch (e) { say({ who: "cowrie", tone: "bad", text: txErr(e) }); }
+    finally { setBusy(false); }
   }
   function deleteSession(id: string) { const next = sessions.filter((x) => x.id !== id); setSessions(next); if (addr) persist("cowrie.sessions." + addr, JSON.stringify(next)); }
   const remember = (fact: string) => setFacts((p) => { if (!fact || p.includes(fact)) return p; const n = [...p, fact].slice(-30); if (addr) persist("cowrie.facts." + addr, JSON.stringify(n)); return n; });
@@ -407,6 +468,7 @@ export default function CowrieApp() {
     setAjos((prev) => { const n = prev.map((a) => (a.id === id ? { ...a, pinged: Date.now() } : a)); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; });
     say({ who: "cowrie", tone: "good", text: `It's your turn in "${c.name}", ${firstName}. I've put a request for ${amtStr(c.amount, c.currency)} to each of the other ${others.length} ${others.length === 1 ? "member" : "members"}, so they know to pay you. They're under People, tap Copy to nudge anyone directly, and I'll tell you the moment money lands. Tap Collected once everyone has paid.` });
     flash(`Pinged ${others.length}`);
+    notify(`Ajo "${c.name}": you're collecting`, `Requests for ${amtStr(c.amount, c.currency)} sent to ${others.map((m) => m.name).join(", ")}. Share them from People, Money requests.`);
   }
   function removeAjo(id: string) { setAjos((prev) => { const n = prev.filter((a) => a.id !== id); if (addr) persist("cowrie.ajo." + addr, JSON.stringify(n)); return n; }); }
   async function payShare(id: string) {
@@ -503,12 +565,12 @@ export default function CowrieApp() {
   async function handle(override?: string) {
     const text = (typeof override === "string" ? override : input).trim();
     if (!text || busy) return;
-    setInput(""); const history = thread.slice(-8).map((mm) => ({ role: mm.who === "you" ? "user" : "assistant", content: mm.text })); say({ who: "you", text }); const b = detectBrand(text); if (b) setBrand(b); setBusy(true);
+    setInput(""); const hist8 = thread.slice(-8).map((mm) => ({ role: mm.who === "you" ? "user" : "assistant", content: mm.text })); say({ who: "you", text }); setExpanded(false); const b = detectBrand(text); if (b) setBrand(b); setBusy(true);
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 25000);
       let it: any;
-      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history, facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
+      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history: hist8, recent: history.slice(0, 10).map((h) => `${h.title} ${h.sign === "neg" ? "-" : h.sign === "pos" ? "+" : ""}${h.amount} (${agoStr(h.ts)})`).join("; "), chats: sessions.slice(0, 5).map((s) => `"${s.title}" (${agoStr(s.ts)})`).join("; "), facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
       finally { clearTimeout(timer); }
       const c = it.currency && it.currency !== "AUTO" && CURRENCIES[it.currency] ? it.currency : ccy;
       const amt = (n: number) => amtStr(n, c);
@@ -649,7 +711,7 @@ export default function CowrieApp() {
           <div className="word">Cowrie</div>
           <span className="chain">on Monad</span>
           <div className="spacer" />
-          {authenticated && (<button className="iconbtn bell" onClick={() => setTab("alerts")} aria-label="Reminders"><Icon size={17}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></Icon>{alertCount > 0 && <span className="badge">{alertCount}</span>}</button>)}
+          {authenticated && (<button className="iconbtn bell" onClick={() => setTab("alerts")} aria-label="Notifications"><Icon size={17}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></Icon>{(alertCount + unread) > 0 && <span className="badge">{alertCount + unread}</span>}</button>)}
           {addr && (
             <button className="addrchip" onClick={copyAddr} title="Copy your wallet address" aria-label="Copy address">
               <span>{addr.slice(0, 6)}…{addr.slice(-4)}</span>
@@ -659,6 +721,7 @@ export default function CowrieApp() {
         </header>
         {tab === "home" && (
           <>
+            {heroOpen ? (<>
             <section className="wallet" style={brand ? ({ ["--edge"]: brand.color } as any) : undefined}>
               <div className="wtop">
                 <span className="wlabel">Spendable</span>
@@ -683,6 +746,14 @@ export default function CowrieApp() {
               <button className={"feat" + (homePanel === "guardian" ? " on" : "")} onClick={() => setHomePanel(homePanel === "guardian" ? null : "guardian")}><span className="fl">Guardian</span><span className="fv">{clPrices.BTC ? `BTC $${(clPrices.BTC.price / 1000).toFixed(1)}k` : "live via Chainlink"}</span></button>
               <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{ajos.length ? `${ajos.length} active` : "fair, via Chainlink"}</span></button>
             </div>
+            </>) : (
+              <div className="minibar">
+                <button className="mbal" onClick={openHero} aria-label="Show wallet"><small>Spendable</small><b>{mask(cfmt(spendable))}</b></button>
+                <button className="mpill" onClick={() => setHomePanel("guardian")}>Guardian<span className="mpv">{clPrices.BTC ? ` $${(clPrices.BTC.price / 1000).toFixed(1)}k` : ""}</span></button>
+                <button className="mpill" onClick={() => setHomePanel("ajo")}>Ajo{ajos.length ? ` ${ajos.length}` : ""}</button>
+                <button className="mchev" onClick={openHero} aria-label="Show wallet">▾</button>
+              </div>
+            )}
             {homePanel && <button className="sheetbg" aria-label="Close panel" onClick={() => setHomePanel(null)} />}
             {homePanel === "guardian" && (
               <div className="sheet">
@@ -721,10 +792,13 @@ export default function CowrieApp() {
             )}
             {!configured && <p className="hint">Add your contract addresses to web/.env.local and restart.</p>}
             {false && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
-            <div className="chips">
-              {starters.map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
-            </div>
-            <div className="thread">
+            {heroOpen && (
+              <div className="chips">
+                {hasChat && <button className="chip hidechip" onClick={() => setExpanded(false)}>Hide ▴</button>}
+                {starters.map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
+              </div>
+            )}
+            <div className="thread" onScroll={() => { if (expanded && hasChat && Date.now() - expandAt.current > 700) setExpanded(false); }}>
               {thread.length === 0 && <p className="empty">Tell Cowrie what to do, in your own words. Try &ldquo;save 10% of everything I receive&rdquo;.</p>}
               {thread.map((m, i) => (
                 <div key={i} style={{ display: "contents" }}>
@@ -742,14 +816,15 @@ export default function CowrieApp() {
           </>
         )}
         {tab === "activity" && (
-          <div className="panel">
+          <div className="panel actpanel">
             <div className="acthead">
               <h2 className="ptitle">Activity</h2>
               <div className="seg"><button className={actView === "portfolio" ? "on" : ""} onClick={() => setActView("portfolio")}>Portfolio</button><button className={actView === "history" ? "on" : ""} onClick={() => setActView("history")}>Payments</button><button className={actView === "chats" ? "on" : ""} onClick={() => setActView("chats")}>Chats</button></div>
             </div>
+            {actView === "portfolio" && <section className="dashcard"><span className="dl">Total balance</span><div className="dv">{mask(cfmt(spendable + savings + defiTotal))}</div><div className="ds">{hidden ? "tap the eye on Home to reveal" : `${cfmt(spendable)} spendable${savings > 0n ? ` · ${cfmt(savings)} savings` : ""}${defiTotal > 0n ? ` · ${cfmt(defiTotal)} in DeFi` : ""}`}</div></section>}
+            <div className="actscroll">
             {actView === "portfolio" ? (
               <>
-                <section className="dashcard"><span className="dl">Total balance</span><div className="dv">{mask(cfmt(spendable + savings + defiTotal))}</div><div className="ds">{hidden ? "tap the eye on Home to reveal" : `${cfmt(spendable)} spendable${savings > 0n ? ` · ${cfmt(savings)} savings` : ""}${defiTotal > 0n ? ` · ${cfmt(defiTotal)} in DeFi` : ""}`}</div></section>
                 <div className="poshead">Savings</div>
                 <div className="pcard">
                   <button className="prow" onClick={() => setOpenPos(openPos === "earn" ? null : "earn")}><span className="prl"><b>Cowrie Earn vault</b><small>10% a year</small></span><span className="prr"><b>{mask(cfmt(earned))}</b><span className="chev">{openPos === "earn" ? "▲" : "▼"}</span></span></button>
@@ -781,8 +856,8 @@ export default function CowrieApp() {
                           <div className="posacts">
                             <button className="mini pay" onClick={() => buyAsset(as.addr, amt)} disabled={busy || !amt || toUnits(amt, ccy) > spendable}>Buy</button>
                             <button className="mini ghost" onClick={() => sellAsset(as.addr, amt)} disabled={busy || !held || !amt}>Sell</button>
-                            {held && <button className="mini ghost" onClick={() => sellAsset(as.addr, 0)} disabled={busy}>Sell all</button>}
                           </div>
+                          {held && (<div className="pctrow"><span>Sell</span>{[25, 50, 75, 100].map((p) => (<button key={p} className="pct" onClick={() => sellPct(as.addr, p)} disabled={busy}>{p === 100 ? "Max" : `${p}%`}</button>))}</div>)}
                         </div>
                       )}
                     </div>
@@ -815,12 +890,12 @@ export default function CowrieApp() {
               </>
             ) : actView === "chats" ? (
               <>
-                <div className="poshead">Saved chats</div>
-                {thread.length > 1 && <button className="mini pay" style={{ marginBottom: 10 }} onClick={saveSession}>Save this chat and start fresh</button>}
-                {sessions.length === 0 ? <p className="muted">Nothing saved yet. When a conversation is worth keeping, save it here and you can reopen it any time.</p> : sessions.map((s) => (
+                <div className="poshead">Your chats <span style={{ color: "var(--dim)", fontWeight: 600 }}>· saved automatically</span></div>
+                <button className="mini pay" style={{ marginBottom: 10 }} onClick={newChat}>Start a new chat</button>
+                {sessions.length === 0 ? <p className="muted">Your conversations save here on their own as you talk to Cowrie, so you can reopen any of them later.</p> : sessions.map((s) => (
                   <div className="chatrow" key={s.id}>
-                    <div className="mid"><b>{s.title}</b><small>{new Date(s.ts).toLocaleString()} · {s.msgs.length} messages</small></div>
-                    <button className="mini ghost" onClick={() => openSession(s.id)}>Open</button>
+                    <div className="mid"><b>{s.title}</b><small>{s.id === curSid.current ? "current chat · " : ""}{agoStr(s.ts)} · {s.msgs.length} messages</small></div>
+                    {s.id !== curSid.current && <button className="mini ghost" onClick={() => openSession(s.id)}>Open</button>}
                     <button className="iconbtn" aria-label="Delete" onClick={() => deleteSession(s.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button>
                   </div>
                 ))}
@@ -832,6 +907,7 @@ export default function CowrieApp() {
                 </div>
               )
             )}
+            </div>
           </div>
         )}
         {tab === "add" && (
@@ -850,7 +926,18 @@ export default function CowrieApp() {
         )}
         {tab === "alerts" && (
           <div className="panel">
-            <h2 className="ptitle">Reminders</h2>
+            <h2 className="ptitle">Notifications</h2>
+            {notes.length === 0 ? <p className="muted">Nothing yet. Money you receive, Guardian price alerts and Ajo due dates show up here.</p> : (
+              <div className="list">
+                {notes.map((n) => (
+                  <div className="noterow" key={n.id}>
+                    <span className={"ndot" + (n.read ? " read" : "")} />
+                    <div className="mid"><b>{n.title}</b><span>{n.body}</span><small>{agoStr(n.ts)}</small></div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="poshead" style={{ marginTop: 18 }}>Reminders</div>
             {subs.length === 0 ? <p className="muted">Nothing to remind you about yet. Tell Cowrie things like &ldquo;remind me to pay rent &#8358;80,000 on the 1st&rdquo; or &ldquo;I subscribed to Netflix for &#8358;4,400 a month&rdquo;, and it will nudge you before each one, to pay or cancel.</p> : (
               <div className="list">
                 {dueSubs.map(({ s, days }) => (

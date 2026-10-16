@@ -15,19 +15,19 @@
 
 Live app: https://cowrie-amber.vercel.app
 
-Cowrie began as a question I wanted an honest answer to. Can the serious infrastructure in crypto right now, Monad for speed, Privy for sign-in and Chainlink for verifiable data, survive contact with ordinary Nigerian life? Not life as a whitepaper imagines it, but the version where someone sends ₦5,000 to their mother, buys MTN airtime for a cousin, runs an ajo with three friends, and has never once wanted to see a seed phrase.
+Cowrie began as a question I wanted an honest answer to. Can the serious infrastructure in crypto right now, Monad for speed, Privy for seamless web3 sign-in and Chainlink for verifiable data, survive contact with ordinary Nigerian life? Not life as a whitepaper imagines it, but the version where someone sends ₦5,000 to their mother, buys MTN airtime for a cousin, runs an ajo with three friends, and has never once wanted to see a seed phrase or take a crash course to understand the interface.
 
 So I built for that person first, in their language and their currency, around savings habits they already have, and let the technology prove itself there.
 
-The order matters. Facebook was a Harvard student directory before it was a global network. Amazon sold only books, in one country. M-Pesa moved money between Kenyan kiosks for years before it became the reference for mobile money everywhere. Things that last usually go narrow and deep somewhere real, then widen. Cowrie is deliberately narrow: naira on the balance by default, Pidgin in the chat, ajo on the home screen.
+Most products that end up everywhere began by winning one small place first. Facebook for instance only let Harvard students sign up at launch, and it spread one college at a time before it opened to everyone. Amazon spent its early years as an online bookshop. M-Pesa had to work for people sending money through Kenyan corner-shop agents before other countries copied it. I have observed this pattern and its success rate well enough to build by it:- prove the product works locally, then scale it. That is the major reason why Cowrie defaults to naira, answers in Pidgin, and puts ajo on the home screen.
 
 ## About
 
-Most people here never touch crypto, and wallets are the reason. There is a seed phrase to lose, a gas token you have to buy before you can move a single cent, and a 42-character address where one wrong letter hands your money to a stranger. A normal bank app is not much kinder. It shows you the damage after the fact, and it will not stop you overspending, save on your behalf, or warn you before a subscription bills again.
+Most people here never touch crypto, and the frictioned UX are the reason. There is a seed phrase to lose, a gas token you have to buy before you can move a single cent, and a 42-character address where one wrong letter hands your money to a stranger. A normal bank app is not much kinder. It shows you the damage first before the fact, and it will not stop you overspending, save on your behalf, or warn you before a subscription bills again.
 
-Cowrie is a stablecoin wallet you talk to. You say what you want, in English, Pidgin, Igbo, Yoruba, Hausa or your own language, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay an allowance, grow your balance in a savings vault, swap into bitcoin, back a prediction, run an ajo circle, or have Chainlink watch a price for you. Every payment is checked against a scam list before it leaves. You sign in with Google, so there is no seed phrase, gas is sponsored, and every amount shows in your own currency.
+Cowrie is a stablecoin wallet you talk to. You say what you want, in English, Pidgin, Igbo, Yoruba, Hausa, or any of the many languages supported, and it happens on-chain in under a second: send money, save a slice of everything you earn, cap your spending, pay an allowance, grow your balance in a savings vault, swap into bitcoin, back a prediction, run an ajo circle, or have Chainlink watch a price action for you. Every payment is checked against a scam list before it leaves. You simply sign in with Google, so there is no seed phrase, gas is sponsored, and every amount shows in your own currency.
 
-It runs on Monad, where everything settles in well under a second, fast enough that saying a thing and watching it happen feel like the same moment.
+It runs on Monad, where everything settles in well under a second, fast enough that saying a thing and watching it happen feels like the same moment.
 
 ## What Cowrie does
 
@@ -39,11 +39,11 @@ Rules are the part a bank app never gives you. Say "save 10% of everything I rec
 
 Growing money happens in the app, not somewhere else. Say "grow my savings" or "earn 50,000" and Cowrie moves that into its own on-chain savings vault, which accrues at 10% a year in this demo and lets you withdraw any time. Say "swap 10,000 into bitcoin" and it trades through a constant-product pool inside the contract, giving you cBTC, cETH or cGOLD to hold and sell back. Say "bet 5,000 that Bitcoin tops $100k" and you take a side on a parimutuel market you settle and claim yourself. Ask for a price and you get Chainlink's live number, not a guess.
 
-Ajo is the feature I most wanted to exist. It is the rotating savings circle Nigerians already run with people they trust, rebuilt so the turn order cannot be rigged and each contribution settles on-chain. There is a countdown to the next cycle, one tap to pay the person whose turn it is, and when your turn comes Cowrie pings the rest of the group with a request each.
+Ajo is the feature I most wanted to exist. It is the rotating savings circle Nigerians already run with people they trust, rebuilt so the turn order is impossible to be rigged and each contribution settles on-chain. There is a countdown to the next cycle, one tap to pay the person whose turn it is, and when your turn comes Cowrie pings the rest of the group with a request each.
 
 Safety is on by default. Every send goes through `ScamRegistry.isFlagged()` before leaving, and an address is blocked once the owner flags it or three people report it.
 
-The assistant speaks like the person using it. It mirrors whatever language you wrote in, switches the moment you switch, and understands both market slang and the local kind, so "gmonad" and "abeg send 5k give my mama" both land. It remembers what matters, keeps your saved facts and contacts in view, and conversations worth keeping can be saved and reopened from the Chats tab.
+The assistant speaks like the person using it. It mirrors whatever language you wrote in, switches the moment you switch, and understands both market slang and the local kind, so "gmonad" and "abeg send 5k give my mama" both lands perfectly. It remembers what matters, keeps your saved facts and contacts in view, and conversations worth keeping can be saved and reopened from the Chats tab.
 
 ## At a glance
 
