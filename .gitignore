@@ -10,3 +10,4 @@ coverage.json
 typechain-types
 web/node_modules
 web/.next
+.cre_build_tmp.js

@@ -1,0 +1,7 @@
+{
+  "schedule": "0 */10 * * * *",
+  "chainName": "monad-mainnet",
+  "btcFeed": "0x187efD8ba8483105f2735740D956f7CD23723deC",
+  "circleName": "Family Ajo",
+  "members": ["Johnson", "Mum", "Tunde", "Ada"]
+}
