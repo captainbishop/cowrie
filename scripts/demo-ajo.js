@@ -30,8 +30,8 @@ async function main() {
 
   if (phase === "setup") {
     for (const w of wallets) {
-      if ((await provider.getBalance(w.address)) < ethers.parseEther("0.03")) {
-        await (await deployer.sendTransaction({ to: w.address, value: ethers.parseEther("0.05") })).wait();
+      if ((await provider.getBalance(w.address)) < ethers.parseEther("0.1")) {
+        await (await deployer.sendTransaction({ to: w.address, value: ethers.parseEther("0.15") })).wait();
       }
     }
     console.log("Test wallets funded with gas.");
@@ -63,7 +63,7 @@ async function main() {
     const round = circle.round;
     for (let i = 0; i < members.length; i++) {
       if (!(await ajo.paid(id, round, members[i].address))) {
-        await (await ajo.connect(members[i]).contribute(id)).wait();
+        try { await (await ajo.connect(members[i]).contribute(id)).wait(); } catch (e) { console.log(NAMES[i] + " could not pay: " + (e.shortMessage ?? e.message)); continue; }
         console.log(`${NAMES[i]} paid for round ${round}.`);
       }
     }

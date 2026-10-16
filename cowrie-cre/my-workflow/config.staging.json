@@ -3,7 +3,7 @@
   "mainnetChain": "monad-mainnet",
   "testnetChain": "monad-testnet",
   "btcFeed": "0x187efD8ba8483105f2735740D956f7CD23723deC",
-  "ajoCircle": "0xD0768572FD9bd52087Bc0aB4ff5563679efDd615",
-  "ajoKeeper": "0xd492e2A9E579a41fD51448E353D628eEd2cB5687",
+  "ajoCircle": "0xdA08704e95De5c8542da59b052b9d6A0C01fd335",
+  "ajoKeeper": "0x19B884C9560DD1207b08CDEC3b50508c9ee5B428",
   "gasLimit": "2000000"
 }
