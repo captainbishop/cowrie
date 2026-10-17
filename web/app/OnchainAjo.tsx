@@ -14,6 +14,8 @@ const tokenAbi = parseAbi([
 
 const MAX = 2n ** 256n - 1n;
 const vaultDepositAbi = parseAbi(["function deposit(uint256 amount)"]);
+// Remembers the last answer so the sheet shows your circles immediately when you reopen it.
+const CACHE = new Map<string, { views: View[]; bal: bigint }>();
 
 type RunUi = { description?: string; successHeader?: string; title?: string; buttonText?: string };
 type RunFn = (fn: string, args: unknown[], ui?: RunUi, target?: { address: `0x${string}`; abi: any }) => Promise<string>;
@@ -33,6 +35,7 @@ type View = {
   myDeposit: bigint;
   myStrikes: number;
   endsAt: number;
+  inviteOnly: boolean;
 };
 
 // amounts are shown in the user's own currency via the fmt prop
@@ -86,8 +89,9 @@ export default function OnchainAjo({
   prefill: { name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null;
 }) {
   const cusd = (v: bigint) => fmt(v);
-  const [views, setViews] = useState<View[]>([]);
-  const [bal, setBal] = useState<bigint>(0n);
+  const [views, setViews] = useState<View[]>(() => CACHE.get((addr || "").toLowerCase())?.views ?? []);
+  const [loaded, setLoaded] = useState(() => CACHE.has((addr || "").toLowerCase()));
+  const [bal, setBal] = useState<bigint>(() => CACHE.get((addr || "").toLowerCase())?.bal ?? 0n);
   const [, setTick] = useState(0);
   const [showForm, setShowForm] = useState(false);
   const [fName, setFName] = useState("Family Ajo");
@@ -128,54 +132,56 @@ export default function OnchainAjo({
   const load = useCallback(async () => {
     if (!addr || !AJO_ADDRESS) return;
     try {
-      const b = await publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] });
+      const [b, countRaw] = await Promise.all([
+        publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] }),
+        read("circleCount", []),
+      ]);
       setBal(b as bigint);
-      const count = Number(await read("circleCount", []));
+      const count = Number(countRaw);
       const nowSec = Math.floor(Date.now() / 1000);
-      const out: View[] = [];
-      for (let i = count; i >= 1 && out.length < 6; i--) {
-        const id = BigInt(i);
-        const c: any = await read("getCircle", [id]);
-        const members: string[] = [...c.members];
-        const mine = members.some((m) => m.toLowerCase() === me);
-        const status = Number(c.status);
-        const joinable = status === 0 && Number(c.joinDeadline) > nowSec;
-        if (!mine && !joinable) continue;
-        if (!mine && c.inviteOnly) {
-          const invited = (await read("isInvited", [id, addr])) as boolean;
-          if (!invited) continue;
-        }
-        let paidNow = false;
-        let myDeposit = 0n;
-        let myStrikes = 0;
-        let endsAt = 0;
-        if (mine) {
-          myDeposit = (await read("depositOf", [id, addr])) as bigint;
-          myStrikes = Number(await read("strikes", [id, addr]));
-          if (status === 2) {
-            paidNow = (await read("paid", [id, Number(c.round), addr])) as boolean;
-            endsAt = Number(await read("roundEnd", [id]));
+      const ids: number[] = [];
+      for (let i = count; i >= 1 && ids.length < 8; i--) ids.push(i);
+      const rows = await Promise.all(
+        ids.map(async (i): Promise<View | null> => {
+          const id = BigInt(i);
+          const c: any = await read("getCircle", [id]);
+          const members: string[] = [...c.members];
+          const mine = members.some((m) => m.toLowerCase() === me);
+          const status = Number(c.status);
+          const joinable = status === 0 && Number(c.joinDeadline) > nowSec;
+          if (!mine && !joinable) return null;
+          if (!mine && c.inviteOnly) {
+            const invited = (await read("isInvited", [id, addr])) as boolean;
+            if (!invited) return null;
           }
-        }
-        out.push({
-          id: i,
-          name: c.name,
-          contribution: c.contribution,
-          deposit: c.deposit,
-          maxMembers: Number(c.maxMembers),
-          round: Number(c.round),
-          status,
-          members,
-          order: [...c.order],
-          mine,
-          paidNow,
-          myDeposit,
-          myStrikes,
-          endsAt,
-        });
-      }
+          let paidNow = false;
+          let myDeposit = 0n;
+          let myStrikes = 0;
+          let endsAt = 0;
+          if (mine) {
+            const [dep, str] = await Promise.all([read("depositOf", [id, addr]), read("strikes", [id, addr])]);
+            myDeposit = dep as bigint;
+            myStrikes = Number(str);
+            if (status === 2) {
+              const [p, e] = await Promise.all([read("paid", [id, Number(c.round), addr]), read("roundEnd", [id])]);
+              paidNow = p as boolean;
+              endsAt = Number(e);
+            }
+          }
+          return {
+            id: i, name: c.name, contribution: c.contribution, deposit: c.deposit,
+            maxMembers: Number(c.maxMembers), round: Number(c.round), status, members,
+            order: [...c.order], mine, paidNow, myDeposit, myStrikes, endsAt, inviteOnly: !!c.inviteOnly,
+          };
+        }),
+      );
+      const out = rows.filter((x): x is View => x !== null).slice(0, 6);
       setViews(out);
-    } catch {}
+      CACHE.set(me, { views: out, bal: b as bigint });
+    } catch {
+    } finally {
+      setLoaded(true);
+    }
   }, [addr, publicClient, read, me]);
 
   useEffect(() => {
@@ -357,7 +363,7 @@ export default function OnchainAjo({
       )}
 
       {views.length === 0 ? (
-        <p className="muted" style={{ marginTop: 2 }}>No on-chain circles yet. Start one, or wait for a friend to start one you can join.</p>
+        <p className="muted" style={{ marginTop: 2 }}>{loaded ? "No on-chain circles yet. Start one, or wait for a friend to start one you can join." : "Loading your circles..."}</p>
       ) : (
         views.map((v) => {
           const left = v.endsAt - Math.floor(Date.now() / 1000);
@@ -367,7 +373,7 @@ export default function OnchainAjo({
               <div className="prow" style={{ cursor: "default" }}>
                 <span className="prl">
                   <b>{v.name}</b>
-                  <small>#{v.id} · {cusd(v.contribution)} each · {v.members.length}/{v.maxMembers} members</small>
+                  <small>#{v.id} · {cusd(v.contribution)} each · {v.members.length}/{v.maxMembers} members{v.inviteOnly ? " · invite-only" : ""}</small>
                 </span>
                 <span className="prr"><b>{AJO_STATUS[v.status]}</b></span>
               </div>
