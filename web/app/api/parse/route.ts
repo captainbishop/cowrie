@@ -225,7 +225,11 @@ export async function POST(req: NextRequest) {
   const ch = typeof chats === "string" && chats.trim() ? chats.slice(0, 500) : "";
   const ctx = ` The user's CURRENT live balances (authoritative, never contradict these): ${typeof bal === "string" && bal ? bal : "unknown"}. Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}. Their saved People contacts (name: address), the authoritative list, use these when they say a name and tell them to open People to see them: ${bk || "none saved yet"}. LIVE Chainlink prices right now (authoritative, this is real data you DO have): ${px || "not loaded yet"}. The user's RECENT WALLET ACTIVITY, newest first (authoritative record of what was sent, paid and received): ${rc || "nothing yet"}. Titles of their earlier saved chats: ${ch || "none yet"}. The ONLY open prediction markets right now are: ${mkts || "none"}. If the user asks to bet on anything else, do not invent a market: use the predict action and the app will show them these, or tell them it is not available and name these.`;
   const llm = await llmParse(text, nm, lg, hist, ctx);
-  const intent = llm && (llm as { action?: string }).action ? llm : rulesParse(text, nm);
+  let intent = llm && (llm as { action?: string }).action ? llm : rulesParse(text, nm);
+  // Safety: anything that mentions an Ajo circle must never turn into a payment. Send it to the Ajo form.
+  if (/\b(ajo|esusu|susu|adashe|thrift|savings? circle|rotating savings)\b/i.test(text) && !["ajo", "reply"].includes((intent as { action?: string }).action || "")) {
+    intent = { action: "ajo", amount: (intent as { amount?: number }).amount } as Intent;
+  }
   const io = intent as { message?: string; reply?: string; reason?: string };
   if (io.message) io.message = deDash(io.message);
   if (io.reply) io.reply = deDash(io.reply);
