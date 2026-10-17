@@ -4,7 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
-import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -100,7 +100,7 @@ function CowrieMark({ size = 28 }: { size?: number }) {
 }
 
 export default function CowrieApp() {
-  const { ready, authenticated, login, logout, user } = usePrivy();
+  const { ready, authenticated, login, logout, user, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
   const { sendTransaction } = useSendTransaction();
   const [spendable, setSpendable] = useState<bigint>(0n);
@@ -140,6 +140,7 @@ export default function CowrieApp() {
   const [nickname, setNickname] = useState("");
   const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; invitees?: string[]; stamp: number } | null>(null);
   const [notes, setNotes] = useState<{ id: string; title: string; body: string; ts: number; read?: boolean }[]>([]);
   const curSid = useRef<string>(Date.now().toString(36));
   const [cName, setCName] = useState("");
@@ -292,6 +293,27 @@ export default function CowrieApp() {
     if (changed) { setGuards(next); if (addr) persist("cowrie.guards." + addr, JSON.stringify(next)); }
   }, [clPrices, guards, addr, firstName]);
   useEffect(() => { if (tab === "home") endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy, tab]);
+  // Tell the user when someone invites them to an on-chain Ajo circle.
+  useEffect(() => {
+    if (!addr || !AJO_ADDRESS) return;
+    let on = true;
+    const check = async () => {
+      try {
+        const count = Number(await publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "circleCount", args: [] }));
+        for (let i = count; i >= Math.max(1, count - 8); i--) {
+          const c: any = await publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "getCircle", args: [BigInt(i)] });
+          if (!on) return;
+          if (Number(c.status) !== 0 || !c.inviteOnly) continue;
+          if ((c.members as string[]).some((m) => m.toLowerCase() === addr.toLowerCase())) continue;
+          const inv = await publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "isInvited", args: [BigInt(i), addr] });
+          if (inv) notify(`Invited to ${c.name}`, `You were invited to the Ajo circle "${c.name}". Open the Ajo sheet on Home to join.`, `ajo-invite-${AJO_ADDRESS.slice(2, 8)}-${i}`);
+        }
+      } catch {}
+    };
+    check();
+    const t = setInterval(check, 20000);
+    return () => { on = false; clearInterval(t); };
+  }, [addr]);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);
   useEffect(() => { const p = [...CHIP_POOL]; for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } setStarters(p.slice(0, 2)); }, []);
   useEffect(() => {
@@ -332,6 +354,48 @@ export default function CowrieApp() {
     return () => mq.removeEventListener?.("change", apply);
   }, [theme]);
   const persist = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} };
+
+  // Contacts follow the login: saved to the account's database when it is set up, restored on any device.
+  const bookSynced = useRef(false);
+  useEffect(() => {
+    bookSynced.current = false;
+    if (!addr || !authenticated) return;
+    let on = true;
+    (async () => {
+      try {
+        const tok = await getAccessToken();
+        if (!tok) return;
+        const r = await fetch("/api/store?key=book", { headers: { Authorization: `Bearer ${tok}` } });
+        if (!r.ok || !on) return;
+        const j = await r.json();
+        if (!on) return;
+        if (Array.isArray(j.value)) {
+          setBook(j.value);
+          persist("cowrie.book." + addr, JSON.stringify(j.value));
+        } else {
+          const local = JSON.parse(localStorage.getItem("cowrie.book." + addr) || "[]");
+          if (Array.isArray(local) && local.length) {
+            await fetch("/api/store", { method: "PUT", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" }, body: JSON.stringify({ key: "book", value: local }) });
+          }
+        }
+        bookSynced.current = true;
+      } catch {}
+    })();
+    return () => { on = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addr, authenticated]);
+  useEffect(() => {
+    if (!bookSynced.current || !addr) return;
+    const t = setTimeout(async () => {
+      try {
+        const tok = await getAccessToken();
+        if (!tok) return;
+        await fetch("/api/store", { method: "PUT", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" }, body: JSON.stringify({ key: "book", value: book }) });
+      } catch {}
+    }, 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book]);
   const changeCcy = (c: string) => { setCcy(c); persist("cowrie.ccy", c); };
   const changeTheme = (t: string) => { setTheme(t); persist("cowrie.theme", t); };
   const changeLang = (l: string) => { setLang(l); persist("cowrie.lang", l); };
@@ -650,8 +714,9 @@ export default function CowrieApp() {
         }
       }
       else if (it.action === "ajo") {
+        { const fromCur = (CURRENCIES[(it.currency && it.currency !== "AUTO" ? it.currency : ccy)] || CURRENCIES.NGN).perUsd; const toCur = (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd; const a0 = it.amount && Number(it.amount) > 0 ? (Number(it.amount) / fromCur) * toCur : undefined; setAjoPrefill({ name: it.name ? String(it.name) : undefined, amount: a0, invitees: Array.isArray(it.members) ? it.members.map((x: unknown) => String(x)) : [], stamp: Date.now() }); }
         setHomePanel("ajo"); setTab("home");
-        say({ who: "cowrie", tone: "good", text: `Ajo circles are on-chain now, ${firstName}. Everyone joins from their own Cowrie and locks a deposit, a Chainlink CRE workflow draws the payout order from the live BTC price, and each round pays out automatically when its timer ends. I have opened the Ajo sheet so you can start one.` });
+        say({ who: "cowrie", tone: "good", text: `Ajo circles are on-chain now, ${firstName}. Everyone joins from their own Cowrie and locks a deposit, a Chainlink CRE workflow draws the payout order from the live BTC price, and each round pays out automatically when its timer ends. I opened the Ajo sheet and filled in what you told me. Check the form and tap Create circle.` });
       } else if (false) {
         const amt = it.amount && Number(it.amount) > 0 ? Number(it.amount) : 0;
         const cur = it.currency && it.currency !== "AUTO" ? it.currency : ccy;
@@ -771,7 +836,7 @@ export default function CowrieApp() {
             {homePanel === "ajo" && (
               <div className="sheet">
                 <div className="sheethead"><span>Ajo circle</span><button className="xbtn" aria-label="Close" onClick={() => setHomePanel(null)}>✕</button></div>
-                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} />
+                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} book={book} prefill={ajoPrefill} />
                 {true ? null : ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; const mine = recipient.name === (firstName || "You"); const daysLeft = c.nextISO ? Math.ceil((new Date(c.nextISO).getTime() - Date.now()) / 86400000) : null; const due = daysLeft !== null && daysLeft <= 0; return (
                   <div className="pcard" key={c.id}>
                     <div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{c.name}</b><small>{amtStr(c.amount, c.currency)} each · {c.members.length} people · cycle {Math.min(c.round + 1, c.members.length)}/{c.members.length}</small></span><button className="iconbtn" aria-label="Remove" onClick={() => removeAjo(c.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></div>

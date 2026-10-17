@@ -1,6 +1,6 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { parseAbi } from "viem";
 import { ajoAbi, AJO_ADDRESS, AJO_STATUS } from "../lib/ajo";
 import { addresses } from "../lib/contracts";
@@ -67,6 +67,8 @@ export default function OnchainAjo({
   symbol,
   perUsd,
   spendable,
+  book,
+  prefill,
 }: {
   addr?: `0x${string}`;
   publicClient: any;
@@ -80,6 +82,8 @@ export default function OnchainAjo({
   symbol: string;
   perUsd: number;
   spendable: bigint;
+  book: { name: string; address: string }[];
+  prefill: { name?: string; amount?: number; invitees?: string[]; stamp: number } | null;
 }) {
   const cusd = (v: bigint) => fmt(v);
   const [views, setViews] = useState<View[]>([]);
@@ -91,8 +95,28 @@ export default function OnchainAjo({
   const [fMult, setFMult] = useState("2");
   const [fMins, setFMins] = useState("5");
   const [fSize, setFSize] = useState("3");
+  const [fInvite, setFInvite] = useState(true);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const me = (addr || "").toLowerCase();
+
+  // The chat can pre-fill this form ("start an ajo called X with Ike, 50k").
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.name) setFName(prefill.name);
+    if (prefill.amount && prefill.amount > 0) setFAmt(String(Math.round(prefill.amount)));
+    const wanted = (prefill.invitees || []).map((n) => n.toLowerCase());
+    const found = book
+      .filter((b) => wanted.some((n) => b.name.toLowerCase() === n || b.name.toLowerCase().startsWith(n)))
+      .map((b) => b.address.toLowerCase());
+    if (found.length) {
+      setPicked(found);
+      setFInvite(true);
+      setFSize(String(Math.min(20, found.length + 1)));
+    }
+    setShowForm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefill]);
   const target = { address: AJO_ADDRESS, abi: ajoAbi };
   const read = useCallback(
     (functionName: string, args: unknown[]) =>
@@ -116,6 +140,10 @@ export default function OnchainAjo({
         const status = Number(c.status);
         const joinable = status === 0 && Number(c.joinDeadline) > nowSec;
         if (!mine && !joinable) continue;
+        if (!mine && c.inviteOnly) {
+          const invited = (await read("isInvited", [id, addr])) as boolean;
+          if (!invited) continue;
+        }
         let paidNow = false;
         let myDeposit = 0n;
         let myStrikes = 0;
@@ -224,12 +252,15 @@ export default function OnchainAjo({
       if (contribution <= 0n) throw new Error("Enter an amount per round.");
       if (!(size >= 2 && size <= 20)) throw new Error("A circle needs 2 to 20 members.");
       if (!(period >= 60)) throw new Error("Rounds must be at least 1 minute.");
+      if (fInvite && picked.length === 0) throw new Error("Pick at least one friend to invite, or switch to Anyone can join.");
       if (!need(deposit)) return false;
       await fund(deposit);
       const joinDeadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 86400);
       await run(
-        "createCircle",
-        [fName.trim(), contribution, deposit, BigInt(period), joinDeadline, size],
+        fInvite ? "createInviteOnlyCircle" : "createCircle",
+        fInvite
+          ? [{ name: fName.trim(), contribution, deposit, period: BigInt(period), joinDeadline, maxMembers: size }, picked]
+          : [fName.trim(), contribution, deposit, BigInt(period), joinDeadline, size],
         { title: `Create "${fName.trim()}"`, description: `Locks a ${cusd(deposit)} deposit.`, successHeader: "Circle created", buttonText: "Create" },
         target,
       );
@@ -287,6 +318,36 @@ export default function OnchainAjo({
               <input value={value} onChange={(e) => set(e.target.value)} style={inputStyle} />
             </label>
           ))}
+          <div style={{ margin: "4px 0 10px" }}>
+            <div className="seg" style={{ marginBottom: 8 }}>
+              <button className={fInvite ? "on" : ""} onClick={() => setFInvite(true)}>Invite-only</button>
+              <button className={!fInvite ? "on" : ""} onClick={() => setFInvite(false)}>Anyone can join</button>
+            </div>
+            {fInvite && (book.length === 0 ? (
+              <div className="ds">Save your friends in People first (name and wallet address), then pick them here.</div>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {book.map((b) => {
+                  const a = b.address.toLowerCase();
+                  const on = picked.includes(a);
+                  return (
+                    <button
+                      key={a}
+                      className={"ajochip" + (on ? " on" : "")}
+                      style={{ cursor: "pointer", font: "inherit" }}
+                      onClick={() => {
+                        const next = on ? picked.filter((x) => x !== a) : [...picked, a];
+                        setPicked(next);
+                        if (next.length) setFSize(String(Math.min(20, next.length + 1)));
+                      }}
+                    >
+                      {on ? "✓ " : ""}{b.name}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
           <div className="ds" style={{ marginBottom: 8 }}>
             You lock the deposit now. Other members join from their own Cowrie and lock the same deposit. When the circle is full, Chainlink CRE draws the payout order, and it pays out each round when the timer ends.
           </div>
