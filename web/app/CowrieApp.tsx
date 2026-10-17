@@ -4,7 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
-import { readAllFeeds, feedKeyFor } from "../lib/chainlink";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -291,7 +291,7 @@ export default function CowrieApp() {
     });
     if (changed) { setGuards(next); if (addr) persist("cowrie.guards." + addr, JSON.stringify(next)); }
   }, [clPrices, guards, addr, firstName]);
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy]);
+  useEffect(() => { if (tab === "home") endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [thread, busy, tab]);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);
   useEffect(() => { const p = [...CHIP_POOL]; for (let i = p.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; } setStarters(p.slice(0, 2)); }, []);
   useEffect(() => {
@@ -423,12 +423,12 @@ export default function CowrieApp() {
     }
     return null;
   }
-  async function run(fn: string, args: unknown[], ui?: { description?: string; successHeader?: string; title?: string; buttonText?: string }) {
-    const data = encodeFunctionData({ abi: vaultAbi, functionName: fn as never, args: args as never });
+  async function run(fn: string, args: unknown[], ui?: { description?: string; successHeader?: string; title?: string; buttonText?: string }, target?: { address: `0x${string}`; abi: any }) {
+    const data = encodeFunctionData({ abi: target?.abi ?? vaultAbi, functionName: fn as never, args: args as never });
     let hash: `0x${string}`;
     try {
       const r = await sendTransaction(
-        { to: addresses.vault, data, chainId: monadTestnet.id },
+        { to: target?.address ?? addresses.vault, data, chainId: monadTestnet.id },
         {  sponsor: true,uiOptions: { showWalletUIs: true, buttonText: ui?.buttonText || "Confirm", successHeader: ui?.successHeader || "All done", successDescription: ui?.description || "", transactionInfo: { title: ui?.title || ui?.description || "Cowrie" } } }
       );
       hash = r.hash as `0x${string}`;
@@ -436,7 +436,7 @@ export default function CowrieApp() {
       const m = (e as { message?: string })?.message || "";
       if (/reject|denied|declined|cancel/i.test(m)) throw e;
       const client = await getWallet();
-      hash = (await client.writeContract({ address: addresses.vault, abi: vaultAbi, functionName: fn as never, args: args as never })) as `0x${string}`;
+      hash = (await client.writeContract({ address: target?.address ?? addresses.vault, abi: target?.abi ?? vaultAbi, functionName: fn as never, args: args as never })) as `0x${string}`;
     }
     const rcpt = await publicClient.waitForTransactionReceipt({ hash });
     if (rcpt.status === "reverted") throw new Error("reverted on-chain");
@@ -650,6 +650,9 @@ export default function CowrieApp() {
         }
       }
       else if (it.action === "ajo") {
+        setHomePanel("ajo"); setTab("home");
+        say({ who: "cowrie", tone: "good", text: `Ajo circles are on-chain now, ${firstName}. Everyone joins from their own Cowrie and locks a deposit, a Chainlink CRE workflow draws the payout order from the live BTC price, and each round pays out automatically when its timer ends. I have opened the Ajo sheet so you can start one.` });
+      } else if (false) {
         const amt = it.amount && Number(it.amount) > 0 ? Number(it.amount) : 0;
         const cur = it.currency && it.currency !== "AUTO" ? it.currency : ccy;
         const names = Array.isArray(it.members) ? it.members.map((x: unknown) => String(x).trim()).filter(Boolean) : [];
@@ -744,13 +747,13 @@ export default function CowrieApp() {
             {earned > 0n && (<button className="earnstrip" onClick={() => setTab("activity")}><span className="ei"><b>{mask(cfmt(earned))} in your Earn vault</b><small>Growing at 10% a year, tap to manage</small></span><span className="earnw">Manage</span></button>)}
             <div className="feats">
               <button className={"feat" + (homePanel === "guardian" ? " on" : "")} onClick={() => setHomePanel(homePanel === "guardian" ? null : "guardian")}><span className="fl">Guardian</span><span className="fv">{clPrices.BTC ? `BTC $${(clPrices.BTC.price / 1000).toFixed(1)}k` : "live via Chainlink"}</span></button>
-              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{ajos.length ? `${ajos.length} active` : "fair, via Chainlink"}</span></button>
+              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{"on-chain, via CRE"}</span></button>
             </div>
             </>) : (
               <div className="minibar">
                 <button className="mbal" onClick={openHero} aria-label="Show wallet"><small>Spendable</small><b>{mask(cfmt(spendable))}</b></button>
                 <button className="mpill" onClick={() => setHomePanel("guardian")}>Guardian<span className="mpv">{clPrices.BTC ? ` $${(clPrices.BTC.price / 1000).toFixed(1)}k` : ""}</span></button>
-                <button className="mpill" onClick={() => setHomePanel("ajo")}>Ajo{ajos.length ? ` ${ajos.length}` : ""}</button>
+                <button className="mpill" onClick={() => setHomePanel("ajo")}>Ajo</button>
                 <button className="mchev" onClick={openHero} aria-label="Show wallet">▾</button>
               </div>
             )}
@@ -768,8 +771,8 @@ export default function CowrieApp() {
             {homePanel === "ajo" && (
               <div className="sheet">
                 <div className="sheethead"><span>Ajo circle</span><button className="xbtn" aria-label="Close" onClick={() => setHomePanel(null)}>✕</button></div>
-                <div className="poshead">Ajo circle <span style={{ color: "var(--brass)", fontWeight: 700 }}>· fair draw via Chainlink</span></div>
-                {ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; const mine = recipient.name === (firstName || "You"); const daysLeft = c.nextISO ? Math.ceil((new Date(c.nextISO).getTime() - Date.now()) / 86400000) : null; const due = daysLeft !== null && daysLeft <= 0; return (
+                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} />
+                {true ? null : ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; const mine = recipient.name === (firstName || "You"); const daysLeft = c.nextISO ? Math.ceil((new Date(c.nextISO).getTime() - Date.now()) / 86400000) : null; const due = daysLeft !== null && daysLeft <= 0; return (
                   <div className="pcard" key={c.id}>
                     <div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{c.name}</b><small>{amtStr(c.amount, c.currency)} each · {c.members.length} people · cycle {Math.min(c.round + 1, c.members.length)}/{c.members.length}</small></span><button className="iconbtn" aria-label="Remove" onClick={() => removeAjo(c.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></div>
                     <div className="posexp">
@@ -794,7 +797,7 @@ export default function CowrieApp() {
             {false && <p className="hint">This wallet needs a little MON to move money. Open the Add tab or fund your address, then try again.</p>}
             {heroOpen && (
               <div className="chips">
-                {hasChat && <button className="chip hidechip" onClick={() => setExpanded(false)}>Hide ▴</button>}
+                
                 {starters.map((q) => (<button key={q} className="chip" onClick={() => setInput(q)}>{q}</button>))}
               </div>
             )}

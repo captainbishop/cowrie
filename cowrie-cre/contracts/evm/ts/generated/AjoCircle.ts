@@ -143,6 +143,24 @@ export type DrawerChangedDecoded = {
 
 
 /**
+ * Filter params for Invited. Only indexed fields can be used for filtering.
+ * Indexed string/bytes must be passed as keccak256 hash (Hex).
+ */
+export type InvitedTopics = {
+  id?: bigint
+  who?: `0x${string}`
+}
+
+/**
+ * Decoded Invited event data.
+ */
+export type InvitedDecoded = {
+  id: bigint
+  who: `0x${string}`
+}
+
+
+/**
  * Filter params for Joined. Only indexed fields can be used for filtering.
  * Indexed string/bytes must be passed as keccak256 hash (Hex).
  */
@@ -238,7 +256,7 @@ export type SlashedDecoded = {
 }
 
 
-export const AjoCircleABI = [{"inputs":[{"internalType":"contractIERC20","name":"token_","type":"address"},{"internalType":"address","name":"drawer_","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"inputs":[],"name":"ReentrancyGuardReentrantCall","type":"error"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"SafeERC20FailedOperation","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"Cancelled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"creator","type":"address"},{"indexed":false,"internalType":"string","name":"name","type":"string"},{"indexed":false,"internalType":"uint256","name":"contribution","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"deposit","type":"uint256"},{"indexed":false,"internalType":"uint64","name":"period","type":"uint64"},{"indexed":false,"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"indexed":false,"internalType":"uint8","name":"maxMembers","type":"uint8"}],"name":"CircleCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"Completed","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"uint8","name":"round","type":"uint8"},{"indexed":true,"internalType":"address","name":"member","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Contributed","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"member","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"DepositWithdrawn","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"drawer","type":"address"}],"name":"DrawerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"member","type":"address"}],"name":"Joined","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"seed","type":"uint256"},{"indexed":false,"internalType":"address[]","name":"order","type":"address[]"}],"name":"OrderSet","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"uint8","name":"round","type":"uint8"},{"indexed":true,"internalType":"address","name":"collector","type":"address"},{"indexed":false,"internalType":"uint256","name":"pot","type":"uint256"}],"name":"RoundSettled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"uint8","name":"round","type":"uint8"},{"indexed":true,"internalType":"address","name":"member","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Slashed","type":"event"},{"inputs":[],"name":"DRAW_GRACE","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MAX_MEMBERS","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MIN_PERIOD","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"cancel","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"circleCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"contribute","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"uint256","name":"contribution","type":"uint256"},{"internalType":"uint256","name":"deposit","type":"uint256"},{"internalType":"uint64","name":"period","type":"uint64"},{"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"internalType":"uint8","name":"maxMembers","type":"uint8"}],"name":"createCircle","outputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"depositOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"drawer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getCircle","outputs":[{"components":[{"internalType":"string","name":"name","type":"string"},{"internalType":"address","name":"creator","type":"address"},{"internalType":"uint256","name":"contribution","type":"uint256"},{"internalType":"uint256","name":"deposit","type":"uint256"},{"internalType":"uint64","name":"period","type":"uint64"},{"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"internalType":"uint64","name":"roundStart","type":"uint64"},{"internalType":"uint8","name":"maxMembers","type":"uint8"},{"internalType":"uint8","name":"round","type":"uint8"},{"internalType":"enumAjoCircle.Status","name":"status","type":"uint8"},{"internalType":"uint256","name":"seed","type":"uint256"},{"internalType":"address[]","name":"members","type":"address[]"},{"internalType":"address[]","name":"order","type":"address[]"}],"internalType":"structAjoCircle.Circle","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getMembers","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getOrder","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"isDue","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"isMember","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"join","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint8","name":"","type":"uint8"},{"internalType":"address","name":"","type":"address"}],"name":"paid","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"roundEnd","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"drawer_","type":"address"}],"name":"setDrawer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"address[]","name":"order","type":"address[]"},{"internalType":"uint256","name":"seed","type":"uint256"}],"name":"setOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"settleRound","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"strikes","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"token","outputs":[{"internalType":"contractIERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"withdrawDeposit","outputs":[],"stateMutability":"nonpayable","type":"function"}] as const
+export const AjoCircleABI = [{"inputs":[{"internalType":"contractIERC20","name":"token_","type":"address"},{"internalType":"address","name":"drawer_","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"inputs":[],"name":"ReentrancyGuardReentrantCall","type":"error"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"SafeERC20FailedOperation","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"Cancelled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"creator","type":"address"},{"indexed":false,"internalType":"string","name":"name","type":"string"},{"indexed":false,"internalType":"uint256","name":"contribution","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"deposit","type":"uint256"},{"indexed":false,"internalType":"uint64","name":"period","type":"uint64"},{"indexed":false,"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"indexed":false,"internalType":"uint8","name":"maxMembers","type":"uint8"}],"name":"CircleCreated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"}],"name":"Completed","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"uint8","name":"round","type":"uint8"},{"indexed":true,"internalType":"address","name":"member","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Contributed","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"member","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"DepositWithdrawn","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"drawer","type":"address"}],"name":"DrawerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"who","type":"address"}],"name":"Invited","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"member","type":"address"}],"name":"Joined","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"seed","type":"uint256"},{"indexed":false,"internalType":"address[]","name":"order","type":"address[]"}],"name":"OrderSet","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"uint8","name":"round","type":"uint8"},{"indexed":true,"internalType":"address","name":"collector","type":"address"},{"indexed":false,"internalType":"uint256","name":"pot","type":"uint256"}],"name":"RoundSettled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"uint8","name":"round","type":"uint8"},{"indexed":true,"internalType":"address","name":"member","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Slashed","type":"event"},{"inputs":[],"name":"DRAW_GRACE","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MAX_INVITES","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MAX_MEMBERS","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MIN_PERIOD","outputs":[{"internalType":"uint64","name":"","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"cancel","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"circleCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"contribute","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"string","name":"name","type":"string"},{"internalType":"uint256","name":"contribution","type":"uint256"},{"internalType":"uint256","name":"deposit","type":"uint256"},{"internalType":"uint64","name":"period","type":"uint64"},{"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"internalType":"uint8","name":"maxMembers","type":"uint8"}],"name":"createCircle","outputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"string","name":"name","type":"string"},{"internalType":"uint256","name":"contribution","type":"uint256"},{"internalType":"uint256","name":"deposit","type":"uint256"},{"internalType":"uint64","name":"period","type":"uint64"},{"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"internalType":"uint8","name":"maxMembers","type":"uint8"}],"internalType":"structAjoCircle.CircleParams","name":"p","type":"tuple"},{"internalType":"address[]","name":"invited","type":"address[]"}],"name":"createInviteOnlyCircle","outputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"depositOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"drawer","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getCircle","outputs":[{"components":[{"internalType":"string","name":"name","type":"string"},{"internalType":"address","name":"creator","type":"address"},{"internalType":"uint256","name":"contribution","type":"uint256"},{"internalType":"uint256","name":"deposit","type":"uint256"},{"internalType":"uint64","name":"period","type":"uint64"},{"internalType":"uint64","name":"joinDeadline","type":"uint64"},{"internalType":"uint64","name":"roundStart","type":"uint64"},{"internalType":"uint8","name":"maxMembers","type":"uint8"},{"internalType":"uint8","name":"round","type":"uint8"},{"internalType":"enumAjoCircle.Status","name":"status","type":"uint8"},{"internalType":"bool","name":"inviteOnly","type":"bool"},{"internalType":"uint256","name":"seed","type":"uint256"},{"internalType":"address[]","name":"members","type":"address[]"},{"internalType":"address[]","name":"order","type":"address[]"}],"internalType":"structAjoCircle.Circle","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getMembers","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"getOrder","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"address[]","name":"who","type":"address[]"}],"name":"invite","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"isDue","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"isInvited","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"isMember","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"join","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint8","name":"","type":"uint8"},{"internalType":"address","name":"","type":"address"}],"name":"paid","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"roundEnd","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"drawer_","type":"address"}],"name":"setDrawer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"},{"internalType":"address[]","name":"order","type":"address[]"},{"internalType":"uint256","name":"seed","type":"uint256"}],"name":"setOrder","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"settleRound","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"address","name":"","type":"address"}],"name":"strikes","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"token","outputs":[{"internalType":"contractIERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"withdrawDeposit","outputs":[],"stateMutability":"nonpayable","type":"function"}] as const
 
 export class AjoCircle {
   constructor(
@@ -264,6 +282,28 @@ export class AjoCircle {
     return decodeFunctionResult({
       abi: AjoCircleABI,
       functionName: 'DRAW_GRACE' as const,
+      data: bytesToHex(result.data),
+    }) as bigint
+  }
+
+  mAXINVITES(
+    runtime: Runtime<unknown>,
+  ): bigint {
+    const callData = encodeFunctionData({
+      abi: AjoCircleABI,
+      functionName: 'MAX_INVITES' as const,
+    })
+
+    const result = this.client
+      .callContract(runtime, {
+        call: encodeCallMsg({ from: zeroAddress, to: this.address, data: callData }),
+        blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+      })
+      .result()
+
+    return decodeFunctionResult({
+      abi: AjoCircleABI,
+      functionName: 'MAX_INVITES' as const,
       data: bytesToHex(result.data),
     }) as bigint
   }
@@ -384,7 +424,7 @@ export class AjoCircle {
   getCircle(
     runtime: Runtime<unknown>,
     id: bigint,
-  ): { name: string; creator: `0x${string}`; contribution: bigint; deposit: bigint; period: bigint; joinDeadline: bigint; roundStart: bigint; maxMembers: number; round: number; status: number; seed: bigint; members: readonly `0x${string}`[]; order: readonly `0x${string}`[] } {
+  ): { name: string; creator: `0x${string}`; contribution: bigint; deposit: bigint; period: bigint; joinDeadline: bigint; roundStart: bigint; maxMembers: number; round: number; status: number; inviteOnly: boolean; seed: bigint; members: readonly `0x${string}`[]; order: readonly `0x${string}`[] } {
     const callData = encodeFunctionData({
       abi: AjoCircleABI,
       functionName: 'getCircle' as const,
@@ -402,7 +442,7 @@ export class AjoCircle {
       abi: AjoCircleABI,
       functionName: 'getCircle' as const,
       data: bytesToHex(result.data),
-    }) as { name: string; creator: `0x${string}`; contribution: bigint; deposit: bigint; period: bigint; joinDeadline: bigint; roundStart: bigint; maxMembers: number; round: number; status: number; seed: bigint; members: readonly `0x${string}`[]; order: readonly `0x${string}`[] }
+    }) as { name: string; creator: `0x${string}`; contribution: bigint; deposit: bigint; period: bigint; joinDeadline: bigint; roundStart: bigint; maxMembers: number; round: number; status: number; inviteOnly: boolean; seed: bigint; members: readonly `0x${string}`[]; order: readonly `0x${string}`[] }
   }
 
   getMembers(
@@ -473,6 +513,31 @@ export class AjoCircle {
     return decodeFunctionResult({
       abi: AjoCircleABI,
       functionName: 'isDue' as const,
+      data: bytesToHex(result.data),
+    }) as boolean
+  }
+
+  isInvited(
+    runtime: Runtime<unknown>,
+    arg0: bigint,
+    arg1: `0x${string}`,
+  ): boolean {
+    const callData = encodeFunctionData({
+      abi: AjoCircleABI,
+      functionName: 'isInvited' as const,
+      args: [arg0, arg1],
+    })
+
+    const result = this.client
+      .callContract(runtime, {
+        call: encodeCallMsg({ from: zeroAddress, to: this.address, data: callData }),
+        blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+      })
+      .result()
+
+    return decodeFunctionResult({
+      abi: AjoCircleABI,
+      functionName: 'isInvited' as const,
       data: bytesToHex(result.data),
     }) as boolean
   }
@@ -683,6 +748,56 @@ export class AjoCircle {
       abi: AjoCircleABI,
       functionName: 'createCircle' as const,
       args: [name, contribution, deposit, period, joinDeadline, maxMembers],
+    })
+
+    const reportResponse = runtime
+      .report(prepareReportRequest(callData))
+      .result()
+
+    return this.client
+      .writeReport(runtime, {
+        receiver: this.address,
+        report: reportResponse,
+        gasConfig,
+      })
+      .result()
+  }
+
+  writeReportFromCreateInviteOnlyCircle(
+    runtime: Runtime<unknown>,
+    p: { name: string; contribution: bigint; deposit: bigint; period: bigint; joinDeadline: bigint; maxMembers: number },
+    invited: readonly `0x${string}`[],
+    gasConfig?: { gasLimit?: string },
+  ) {
+    const callData = encodeFunctionData({
+      abi: AjoCircleABI,
+      functionName: 'createInviteOnlyCircle' as const,
+      args: [p, invited],
+    })
+
+    const reportResponse = runtime
+      .report(prepareReportRequest(callData))
+      .result()
+
+    return this.client
+      .writeReport(runtime, {
+        receiver: this.address,
+        report: reportResponse,
+        gasConfig,
+      })
+      .result()
+  }
+
+  writeReportFromInvite(
+    runtime: Runtime<unknown>,
+    id: bigint,
+    who: readonly `0x${string}`[],
+    gasConfig?: { gasLimit?: string },
+  ) {
+    const callData = encodeFunctionData({
+      abi: AjoCircleABI,
+      functionName: 'invite' as const,
+      args: [id, who],
     })
 
     const reportResponse = runtime
@@ -1282,6 +1397,77 @@ export class AjoCircle {
     })
     const { data: _, ...rest } = log
     return { ...rest, data: decoded.args as unknown as DrawerChangedDecoded }
+  }
+
+  /**
+   * Creates a log trigger for Invited events.
+   * The returned trigger's adapt method decodes the raw log into InvitedDecoded,
+   * so the handler receives typed event data directly.
+   * When multiple filters are provided, topic values are merged with OR semantics (match any).
+   */
+  logTriggerInvited(
+    filters?: InvitedTopics[],
+  ) {
+    let topics: { values: string[] }[]
+    if (!filters || filters.length === 0) {
+      const encoded = encodeEventTopics({
+        abi: AjoCircleABI,
+        eventName: 'Invited' as const,
+      })
+      topics = encoded.map((t) => ({ values: encodeTopicValue(t) }))
+    } else if (filters.length === 1) {
+      const f = filters[0]
+      const args = {
+        id: f.id,
+        who: f.who,
+      }
+      const encoded = encodeEventTopics({
+        abi: AjoCircleABI,
+        eventName: 'Invited' as const,
+        args,
+      })
+      topics = encoded.map((t) => ({ values: encodeTopicValue(t) }))
+    } else {
+      const allEncoded = filters.map((f) => {
+        const args = {
+          id: f.id,
+          who: f.who,
+        }
+        return encodeEventTopics({
+          abi: AjoCircleABI,
+          eventName: 'Invited' as const,
+          args,
+        })
+      })
+      topics = allEncoded[0].map((_, i) => ({
+        values: [...new Set(allEncoded.flatMap((row) => encodeTopicValue(row[i])))],
+      }))
+    }
+    const baseTrigger = this.client.logTrigger({
+      addresses: [hexToBase64(this.address)],
+      topics,
+    })
+    const contract = this
+    return {
+      capabilityId: () => baseTrigger.capabilityId(),
+      method: () => baseTrigger.method(),
+      outputSchema: () => baseTrigger.outputSchema(),
+      configAsAny: () => baseTrigger.configAsAny(),
+      adapt: (rawOutput: EVMLog): DecodedLog<InvitedDecoded> => contract.decodeInvited(rawOutput),
+    }
+  }
+
+  /**
+   * Decodes a log into Invited data, preserving all log metadata.
+   */
+  decodeInvited(log: EVMLog): DecodedLog<InvitedDecoded> {
+    const decoded = decodeEventLog({
+      abi: AjoCircleABI,
+      data: bytesToHex(log.data),
+      topics: log.topics.map((t) => bytesToHex(t)) as [Hex, ...Hex[]],
+    })
+    const { data: _, ...rest } = log
+    return { ...rest, data: decoded.args as unknown as InvitedDecoded }
   }
 
   /**

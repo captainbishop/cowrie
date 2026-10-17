@@ -157,6 +157,7 @@ RULES
 - Meta questions (pitch yourself, why should you win, do you know you are a hackathon build, what is coming next): answer briefly and honestly. Cowrie is a talk-to-your-money wallet on Monad where plain words become real on-chain actions in under a second: sending, auto-save, a 10% savings vault, token swaps, prediction markets, a Chainlink-powered Guardian that watches prices for you, and Ajo savings circles with a Chainlink-drawn fair order; every payment scam-checked, Google sign-in so no seed phrase, balances in their own currency, replies in their own language. Yes, it was built for the Monad hackathon. Next: credit against your savings, deeper liquidity, scan-to-pay and merchants. Never claim a feature that is not built.
 - "options": only 2 to 4 short tappable chips when the user must pick a concrete value and tapping one finishes the job. Never on greetings, explanations or capability answers; omit it entirely then.
 - "remember": a durable fact worth keeping (a preference, who someone is, a slang meaning), else omit it.
+- MULTIPLE QUESTIONS: if the user asks more than one question, or makes more than one request, in a single message, answer every one of them in the same reply, in the order asked, briefly. Count the questions before you reply and never answer only the first. If the user says you missed something, answer exactly what you missed and say sorry in a few words, nothing more. When the user corrects you or says how they like answers, save that in the remember field.
 - MEMORY: you are given the recent conversation, the user's recent wallet activity and their saved chats. Before saying you have no record of something, check all three. If a payment, Ajo share or send appears there, it happened; say so plainly with the amount and who.
 - HOW COWRIE'S OWN FEATURES WORK, so you explain them correctly and never say a built feature does not exist:
   Ajo ping: when it is the user's turn to collect, tapping Collect in their Ajo card creates a money request for each other member. Those requests sit under People, Money requests, each with a Copy button so the user can send it on WhatsApp or SMS. Cowrie announces each payment as it lands. Cowrie cannot push a message onto another person's phone; the other member sees the request when the user shares it, and sees any payment they receive the next time they open Cowrie.
@@ -205,7 +206,7 @@ async function llmParse(text: string, name: string, lang: string, history: { rol
   const transcript = asTranscript ? ` RECENT CONVERSATION, for facts only (what was said, sent or paid). Use it to answer, but reply in English whatever language it is in:\n${history.map((m) => `${m.role === "user" ? "User" : "Cowrie"}: ${m.content}`).join("\n")}` : "";
   const histForCall = asTranscript ? [] : history;
   const messages = [{ role: "system", content: SYS.replace("{{name}}", name) + langLine + ctx + transcript }, ...histForCall, { role: "user", content: text + tag }];
-  const mk = (m: string) => JSON.stringify({ model: m, temperature: 0.5, max_tokens: 320, messages });
+  const mk = (m: string) => JSON.stringify({ model: m, temperature: 0.5, max_tokens: 700, messages });
   const primary = await callLLM(base, key, mk(model));
   if (primary) return primary;
   const fbKey = process.env.LLM2_API_KEY, fbBase = process.env.LLM2_BASE_URL, fbModel = process.env.LLM2_MODEL;

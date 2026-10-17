@@ -259,3 +259,9 @@ body { background:var(--bg-grad); background-attachment:fixed; color:var(--text)
 :root:not([data-theme="dark"]) .primary { box-shadow:0 6px 14px -8px rgba(74,55,214,.45); }
 :root:not([data-theme="dark"]) .primary:disabled { box-shadow:none; }
 :root:not([data-theme="dark"]) .card3d { box-shadow:0 12px 24px -16px rgba(63,47,174,.4); }
+/* Highlight fix: leave room above the chips and stop the hover lift from clipping */
+.chips { padding-top: 3px; margin-top: 9px; }
+.chips .chip:hover, .feat:hover { transform: none; }
+@media (max-width: 480px), (max-height: 780px) {
+  .chips { margin-top: 5px; }
+}
