@@ -26,6 +26,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         uint8 maxMembers;
         uint8 round;
         Status status;
+        bool inviteOnly;
         uint256 seed;
         address[] members;
         address[] order;
@@ -34,6 +35,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
     uint64 public constant MIN_PERIOD = 60;
     uint8 public constant MAX_MEMBERS = 20;
     uint64 public constant DRAW_GRACE = 3 days;
+    uint256 public constant MAX_INVITES = 50;
 
     IERC20 public immutable token;
     address public drawer;
@@ -41,12 +43,14 @@ contract AjoCircle is ReentrancyGuard, Ownable {
 
     mapping(uint256 => Circle) private circles;
     mapping(uint256 => mapping(address => bool)) public isMember;
+    mapping(uint256 => mapping(address => bool)) public isInvited;
     mapping(uint256 => mapping(address => uint256)) public depositOf;
     mapping(uint256 => mapping(address => uint8)) public strikes;
     mapping(uint256 => mapping(uint8 => mapping(address => bool))) public paid;
 
     event CircleCreated(uint256 indexed id, address indexed creator, string name, uint256 contribution, uint256 deposit, uint64 period, uint64 joinDeadline, uint8 maxMembers);
     event Joined(uint256 indexed id, address indexed member);
+    event Invited(uint256 indexed id, address indexed who);
     event OrderSet(uint256 indexed id, uint256 seed, address[] order);
     event Contributed(uint256 indexed id, uint8 indexed round, address indexed member, uint256 amount);
     event Slashed(uint256 indexed id, uint8 indexed round, address indexed member, uint256 amount);
@@ -103,6 +107,63 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         _join(id, msg.sender);
     }
 
+    struct CircleParams {
+        string name;
+        uint256 contribution;
+        uint256 deposit;
+        uint64 period;
+        uint64 joinDeadline;
+        uint8 maxMembers;
+    }
+
+    /// @notice Create an invite-only circle: only the creator and the listed addresses can join.
+    function createInviteOnlyCircle(CircleParams calldata p, address[] calldata invited)
+        external
+        nonReentrant
+        returns (uint256 id)
+    {
+        require(invited.length > 0 && invited.length <= MAX_INVITES, "bad invite list");
+        require(p.contribution > 0, "contribution=0");
+        require(p.deposit >= p.contribution, "deposit<contribution");
+        require(p.period >= MIN_PERIOD, "period too short");
+        require(p.maxMembers >= 2 && p.maxMembers <= MAX_MEMBERS, "bad size");
+        require(p.joinDeadline > block.timestamp, "deadline passed");
+
+        id = ++circleCount;
+        Circle storage c = circles[id];
+        c.name = p.name;
+        c.creator = msg.sender;
+        c.contribution = p.contribution;
+        c.deposit = p.deposit;
+        c.period = p.period;
+        c.joinDeadline = p.joinDeadline;
+        c.maxMembers = p.maxMembers;
+        c.status = Status.Open;
+        c.inviteOnly = true;
+
+        emit CircleCreated(id, msg.sender, p.name, p.contribution, p.deposit, p.period, p.joinDeadline, p.maxMembers);
+        _invite(id, invited);
+        _join(id, msg.sender);
+    }
+
+    /// @notice The creator can invite more people while the circle is still open.
+    function invite(uint256 id, address[] calldata who) external exists(id) {
+        Circle storage c = circles[id];
+        require(msg.sender == c.creator, "not creator");
+        require(c.inviteOnly, "open to anyone");
+        require(c.status == Status.Open, "not open");
+        require(who.length > 0 && who.length <= MAX_INVITES, "bad invite list");
+        _invite(id, who);
+    }
+
+    function _invite(uint256 id, address[] calldata who) internal {
+        for (uint256 i = 0; i < who.length; i++) {
+            require(who[i] != address(0), "zero address");
+            isInvited[id][who[i]] = true;
+            emit Invited(id, who[i]);
+        }
+    }
+
     function join(uint256 id) external nonReentrant exists(id) {
         _join(id, msg.sender);
     }
@@ -111,6 +172,7 @@ contract AjoCircle is ReentrancyGuard, Ownable {
         Circle storage c = circles[id];
         require(c.status == Status.Open, "not open");
         require(block.timestamp <= c.joinDeadline, "join closed");
+        if (c.inviteOnly) require(who == c.creator || isInvited[id][who], "not invited");
         require(!isMember[id][who], "already joined");
         require(c.members.length < c.maxMembers, "full");
 
