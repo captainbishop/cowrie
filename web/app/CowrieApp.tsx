@@ -140,12 +140,14 @@ export default function CowrieApp() {
   const [nickname, setNickname] = useState("");
   const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
   const [expanded, setExpanded] = useState(false);
-  const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; invitees?: string[]; stamp: number } | null>(null);
+  const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null>(null);
   const [notes, setNotes] = useState<{ id: string; title: string; body: string; ts: number; read?: boolean }[]>([]);
   const curSid = useRef<string>(Date.now().toString(36));
   const [cName, setCName] = useState("");
   const [cAddr, setCAddr] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
+  const awaitingName = useRef(false);
+  const askedName = useRef(false);
   const seenIn = useRef<Set<string> | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -334,6 +336,16 @@ export default function CowrieApp() {
     })();
   }, [addr, configured]);
   useEffect(() => { if (authenticated && configured && !greeted.current) { greeted.current = true; const h = new Date().getHours(); const tod = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; setThread((t) => (t.length ? t : [{ who: "cowrie", text: pick([`${tod}, ${firstName}. Your money's ready, tell me what to do, or tap a suggestion.`, `${tod}, ${firstName}. What should we do with your money today?`]) }])); } }, [authenticated, configured, firstName]);
+  // First time on this device: ask what Cowrie should call the user, instead of using the email name.
+  useEffect(() => {
+    if (!authenticated || !addr || !configured || askedName.current) return;
+    askedName.current = true;
+    let saved = "";
+    try { saved = localStorage.getItem("cowrie.nick." + addr) || ""; } catch {}
+    if (saved) return;
+    awaitingName.current = true;
+    setThread((t) => [...t, { who: "cowrie", text: "Before we start, what should I call you? A first name or a nickname is fine, and you can change it any time in Settings." }]);
+  }, [authenticated, addr, configured]);
   useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.book." + addr); setBook(s ? JSON.parse(s) : []); } catch {} }, [addr]);
@@ -629,6 +641,18 @@ export default function CowrieApp() {
   async function handle(override?: string) {
     const text = (typeof override === "string" ? override : input).trim();
     if (!text || busy) return;
+    if (awaitingName.current) {
+      if (/\d|0x/i.test(text) || text.split(/\s+/).length > 4) awaitingName.current = false;
+      else {
+        setInput(""); say({ who: "you", text });
+        const given = text.replace(/^(please\s+)?(call me|my name is|name is|i am|i'm|it's|its)\s+/i, "").replace(/[^A-Za-z\u00C0-\u024F0-9 '.-]/g, "").trim().slice(0, 24);
+        if (!given) { say({ who: "cowrie", text: "What should I call you? A first name or a nickname is fine." }); return; }
+        const chosen = given[0].toUpperCase() + given.slice(1);
+        awaitingName.current = false; setNick(chosen);
+        say({ who: "cowrie", tone: "good", text: `Nice to meet you, ${chosen}. I'll call you that from now on. What would you like to do with your money?` });
+        return;
+      }
+    }
     setInput(""); const hist8 = thread.slice(-8).map((mm) => ({ role: mm.who === "you" ? "user" : "assistant", content: mm.text })); say({ who: "you", text }); setExpanded(false); const b = detectBrand(text); if (b) setBrand(b); setBusy(true);
     try {
       const ctrl = new AbortController();
@@ -714,7 +738,7 @@ export default function CowrieApp() {
         }
       }
       else if (it.action === "ajo") {
-        { const fromCur = (CURRENCIES[(it.currency && it.currency !== "AUTO" ? it.currency : ccy)] || CURRENCIES.NGN).perUsd; const toCur = (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd; const a0 = it.amount && Number(it.amount) > 0 ? (Number(it.amount) / fromCur) * toCur : undefined; setAjoPrefill({ name: it.name ? String(it.name) : undefined, amount: a0, invitees: Array.isArray(it.members) ? it.members.map((x: unknown) => String(x)) : [], stamp: Date.now() }); }
+        { const fromCur = (CURRENCIES[(it.currency && it.currency !== "AUTO" ? it.currency : ccy)] || CURRENCIES.NGN).perUsd; const toCur = (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd; const a0 = it.amount && Number(it.amount) > 0 ? (Number(it.amount) / fromCur) * toCur : undefined; setAjoPrefill({ name: it.name ? String(it.name) : undefined, amount: a0, minutes: typeof it.minutes === "number" && it.minutes > 0 ? it.minutes : undefined, invitees: Array.isArray(it.members) ? it.members.map((x: unknown) => String(x)) : [], stamp: Date.now() }); }
         setHomePanel("ajo"); setTab("home");
         say({ who: "cowrie", tone: "good", text: `Ajo circles are on-chain now, ${firstName}. Everyone joins from their own Cowrie and locks a deposit, a Chainlink CRE workflow draws the payout order from the live BTC price, and each round pays out automatically when its timer ends. I opened the Ajo sheet and filled in what you told me. Check the form and tap Create circle.` });
       } else if (false) {

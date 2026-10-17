@@ -7,7 +7,7 @@ type Intent =
   | { action: "send"; to: string; amount: number; currency: string }
   | { action: "saveContact"; name: string; address: string }
   | { action: "guardian"; asset: string; op: "below" | "above"; price: number; act: "protect" | "notify" | "buy" | "sell"; amount?: number; currency?: string }
-  | { action: "ajo"; name?: string; amount?: number; currency?: string; members?: string[] }
+  | { action: "ajo"; name?: string; amount?: number; currency?: string; members?: string[]; minutes?: number }
   | { action: "price"; asset?: string }
   | { action: "setName"; name: string }
   | { action: "fund"; amount: number; currency: string }
@@ -135,7 +135,7 @@ Output ONLY one JSON object, no markdown:
 {"action":"split","amount":n,"currency":C,"people":n,"names":[s]}
 {"action":"predict","side":"yes"|"no","amount":n,"market":s}
 {"action":"guardian","asset":s,"op":"below"|"above","price":n,"act":"protect"|"notify"|"buy"|"sell","amount":n}
-{"action":"ajo","name":s,"amount":n,"currency":C,"members":[s]}
+{"action":"ajo","name":s,"amount":n,"currency":C,"members":[s],"minutes":n}
 {"action":"saveContact","name":s,"address":s}
 {"action":"setName","name":s}
 {"action":"reply","message":s,"remember":s,"options":[s]}
@@ -159,7 +159,7 @@ RULES
 - MEMORY: you are given the recent conversation, the user's recent wallet activity and their saved chats. Before saying you have no record of something, check all three. If a payment, Ajo share or send appears there, it happened; say so plainly with the amount and who.
 - HOW COWRIE'S OWN FEATURES WORK, so you explain them correctly and never say a built feature does not exist:
   Ajo (on-chain): an Ajo circle is a real contract on Monad. The creator picks the amount each person pays per round, a security deposit (at least one payment, bigger is safer), the round length and the number of members. Members join from their OWN Cowrie account and lock the deposit, so the creator cannot add people for them. When the circle is full, a Chainlink CRE workflow draws the payout order from the live Chainlink BTC price, so nobody can rig who collects first, and records it on-chain. Each round, everyone pays their share before the timer ends; when it ends, the workflow settles the round and the whole pot goes to that round's collector. A missed payment is taken from the member's deposit so the collector is still paid in full, and the member gets a strike. After the last round everyone withdraws what is left of their deposit. Circles can be invite-only, so only the people the creator names can join.
-  When the user wants to start, join or pay an Ajo, tell them to open the Ajo sheet on Home, where the buttons do it. Do not ask for cycle days or a list of members, and do not say you will set the circle up from the chat.
+  When the user wants to start, join or pay an Ajo, tell them to open the Ajo sheet on Home, where the buttons do it. Do not ask for cycle days or a list of members, and do not say you will set the circle up from the chat. If they give a round length (5 min, 2 hours, daily, weekly), put it in "minutes" (a day is 1440, a week is 10080) and never invent one.
   Honest limits: the draw and the payouts are run by a CRE workflow today, in simulation on Monad testnet with test money, not yet deployed live on Chainlink's network. Never claim real money or a live production deployment.
   Incoming money: when anyone sends the user money, Cowrie reads it from the chain, adds it to Payments under Activity and posts it in Notifications under the bell.
   Chats save automatically under Activity, Chats, and can be reopened any time.`;

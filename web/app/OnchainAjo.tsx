@@ -83,7 +83,7 @@ export default function OnchainAjo({
   perUsd: number;
   spendable: bigint;
   book: { name: string; address: string }[];
-  prefill: { name?: string; amount?: number; invitees?: string[]; stamp: number } | null;
+  prefill: { name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null;
 }) {
   const cusd = (v: bigint) => fmt(v);
   const [views, setViews] = useState<View[]>([]);
@@ -104,6 +104,7 @@ export default function OnchainAjo({
   useEffect(() => {
     if (!prefill) return;
     if (prefill.name) setFName(prefill.name);
+    if (prefill.minutes && prefill.minutes > 0) setFMins(String(prefill.minutes));
     if (prefill.amount && prefill.amount > 0) setFAmt(String(Math.round(prefill.amount)));
     const wanted = (prefill.invitees || []).map((n) => n.toLowerCase());
     const found = book
