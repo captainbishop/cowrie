@@ -305,7 +305,7 @@ export default function OnchainAjo({
       </div>
       <div className="ds" style={{ marginBottom: 8 }}>Spendable: {cusd(spendable)}{bal > 0n ? ` · ${cusd(bal)} waiting in your wallet` : ""}</div>
       <div className="posacts" style={{ marginBottom: 10 }}>
-        {bal > 0n && <button className="mini ghost" onClick={moveToSpendable} disabled={busy}>Move {cusd(bal)} to spendable</button>}
+        {bal > 0n && <button className="mini pay" onClick={moveToSpendable} disabled={busy}>Move {cusd(bal)} to spendable</button>}
         <button className="mini pay" onClick={() => setShowForm(!showForm)}>{showForm ? "Close" : "Start an on-chain Ajo"}</button>
       </div>
 
