@@ -198,7 +198,7 @@ export default function OnchainAjo({
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 25000);
+    const t = setInterval(load, 45000);
     return () => clearInterval(t);
   }, [load]);
 

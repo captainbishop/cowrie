@@ -323,7 +323,7 @@ export default function CowrieApp() {
       if (typeof document !== "undefined" && document.hidden) return;
       try {
         const count = Number(await publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "circleCount", args: [] }));
-        for (let i = count; i >= Math.max(1, count - 8); i--) {
+        for (let i = count; i >= Math.max(1, count - 4); i--) {
           const c: any = await publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "getCircle", args: [BigInt(i)] });
           if (!on) return;
           if (Number(c.status) !== 0 || !c.inviteOnly) continue;
@@ -334,7 +334,7 @@ export default function CowrieApp() {
       } catch {}
     };
     check();
-    const t = setInterval(check, 40000);
+    const t = setInterval(check, 120000);
     return () => { on = false; clearInterval(t); };
   }, [addr]);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);

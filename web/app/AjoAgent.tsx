@@ -79,7 +79,7 @@ export default function AjoAgent(props: Props) {
     ]);
     const nowSec = Math.floor(Date.now() / 1000);
     const ids: number[] = [];
-    for (let i = Number(countRaw); i >= 1 && ids.length < 8; i--) ids.push(i);
+    for (let i = Number(countRaw); i >= 1 && ids.length < 5; i--) ids.push(i);
     const rows = await Promise.all(
       ids.map(async (i): Promise<Snap | null> => {
         const id = BigInt(i);
@@ -203,7 +203,7 @@ export default function AjoAgent(props: Props) {
       } catch {}
     };
     tick();
-    const t = setInterval(tick, 30000);
+    const t = setInterval(tick, 90000);
     return () => { on = false; clearInterval(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addr, snapshot]);
