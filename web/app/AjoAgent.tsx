@@ -57,6 +57,7 @@ type Props = {
   command: AjoCommand | null;
   exec: AjoExec | null;
   refresh: () => Promise<unknown> | void;
+  setSummary: (s: { live: number; open: number; invited: number; done: number }) => void;
 };
 
 // Runs in the background: watches the user's Ajo circles, raises alerts, and carries out chat commands.
@@ -143,10 +144,12 @@ export default function AjoAgent(props: Props) {
     if (!AJO_ADDRESS) return;
     let on = true;
     const tick = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const { snaps } = await snapshot();
         if (!on) return;
         const { say, notify, setPending, fmt } = api.current;
+        api.current.setSummary({ live: snaps.filter((s) => s.mine && s.status === 2).length, open: snaps.filter((s) => s.mine && s.status <= 1).length, invited: snaps.filter((s) => !s.mine && s.joinable).length, done: snaps.filter((s) => s.mine && s.status >= 3).length });
         const nowSec = Math.floor(Date.now() / 1000);
         const tag = AJO_ADDRESS.slice(2, 8);
         const store = "cowrie.ajo.seen." + me;

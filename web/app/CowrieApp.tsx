@@ -142,6 +142,7 @@ export default function CowrieApp() {
   const [expanded, setExpanded] = useState(false);
   const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null>(null);
   const [ajoCmd, setAjoCmd] = useState<AjoCommand | null>(null);
+  const [ajoSummary, setAjoSummary] = useState<{ live: number; open: number; invited: number; done: number } | null>(null);
   const [ajoExec, setAjoExec] = useState<AjoExec | null>(null);
   const ajoPending = useRef<AjoPending | null>(null);
   const [linkCircle, setLinkCircle] = useState<number | null>(null);
@@ -319,6 +320,7 @@ export default function CowrieApp() {
     if (!addr || !AJO_ADDRESS) return;
     let on = true;
     const check = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const count = Number(await publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "circleCount", args: [] }));
         for (let i = count; i >= Math.max(1, count - 8); i--) {
@@ -678,10 +680,13 @@ export default function CowrieApp() {
       } else ajoPending.current = null;
     }
     if (awaitingName.current) {
-      if (/\d|0x/i.test(text) || text.split(/\s+/).length > 4) awaitingName.current = false;
+      if (/\d|0x/i.test(text) || text.split(/\s+/).length > 6) awaitingName.current = false;
       else {
         setInput(""); say({ who: "you", text });
-        const given = text.replace(/^(please\s+)?(call me|my name is|name is|i am|i'm|it's|its)\s+/i, "").replace(/[^A-Za-z\u00C0-\u024F0-9 '.-]/g, "").trim().slice(0, 24);
+        const nameWords = text.replace(/[^A-Za-z\u00C0-\u024F0-9 '.-]/g, " ").trim().split(/\s+/).filter(Boolean);
+        const lead = /^(ok|okay|hi|hello|hey|so|well|please|pls|call|cal|cam|me|my|name|is|am|i|i'm|im|it's|its|you|can|may|abeg|just|people|they|the|a|as)$/i;
+        const core = nameWords.filter((w) => !lead.test(w));
+        const given = (core.length ? core.slice(0, 2) : nameWords.slice(-1)).join(" ").slice(0, 24);
         if (!given) { say({ who: "cowrie", text: "What should I call you? A first name or a nickname is fine." }); return; }
         const chosen = given[0].toUpperCase() + given.slice(1);
         awaitingName.current = false; setNick(chosen);
@@ -843,7 +848,7 @@ export default function CowrieApp() {
           <div className="word">Cowrie</div>
           <span className="chain">on Monad</span>
           <div className="spacer" />
-          {authenticated && addr && (<AjoAgent addr={addr as `0x${string}`} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} errText={txErr} fmt={cfmt} spendable={spendable} book={book} say={say} notify={notify} setPending={(p: AjoPending | null) => { ajoPending.current = p; }} command={ajoCmd} exec={ajoExec} refresh={refresh} />)}
+          {authenticated && addr && (<AjoAgent addr={addr as `0x${string}`} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} errText={txErr} fmt={cfmt} spendable={spendable} book={book} say={say} notify={notify} setPending={(p: AjoPending | null) => { ajoPending.current = p; }} command={ajoCmd} exec={ajoExec} refresh={refresh} setSummary={setAjoSummary} />)}
           {authenticated && (<button className="iconbtn bell" onClick={() => setTab("alerts")} aria-label="Notifications"><Icon size={17}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></Icon>{(alertCount + unread) > 0 && <span className="badge">{alertCount + unread}</span>}</button>)}
           {addr && (
             <button className="addrchip" onClick={copyAddr} title="Copy your wallet address" aria-label="Copy address">
@@ -877,7 +882,7 @@ export default function CowrieApp() {
             {earned > 0n && (<button className="earnstrip" onClick={() => setTab("activity")}><span className="ei"><b>{mask(cfmt(earned))} in your Earn vault</b><small>Growing at 10% a year, tap to manage</small></span><span className="earnw">Manage</span></button>)}
             <div className="feats">
               <button className={"feat" + (homePanel === "guardian" ? " on" : "")} onClick={() => setHomePanel(homePanel === "guardian" ? null : "guardian")}><span className="fl">Guardian</span><span className="fv">{clPrices.BTC ? `BTC $${(clPrices.BTC.price / 1000).toFixed(1)}k` : "live via Chainlink"}</span></button>
-              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{"on-chain, via CRE"}</span></button>
+              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{ajoSummary ? (ajoSummary.live ? `${ajoSummary.live} live` : ajoSummary.open ? `${ajoSummary.open} open` : ajoSummary.invited ? `${ajoSummary.invited} to join` : "no live circle") : "on-chain, via CRE"}</span></button>
             </div>
             </>) : (
               <div className="minibar">

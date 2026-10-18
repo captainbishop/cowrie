@@ -104,6 +104,7 @@ export default function OnchainAjo({
   const [fUnit, setFUnit] = useState("minutes");
   const [fSize, setFSize] = useState("3");
   const [fInvite, setFInvite] = useState(true);
+  const [secTab, setSecTab] = useState<"auto" | "live" | "open" | "join" | "done">("auto");
   const [picked, setPicked] = useState<string[]>([]);
 
   const me = (addr || "").toLowerCase();
@@ -140,6 +141,7 @@ export default function OnchainAjo({
 
   const load = useCallback(async () => {
     if (!addr || !AJO_ADDRESS) return;
+    if (typeof document !== "undefined" && document.hidden) return;
     try {
       const [b, countRaw] = await Promise.all([
         publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] }),
@@ -305,6 +307,12 @@ export default function OnchainAjo({
 
   const who = (a: string) => (a.toLowerCase() === me ? "You" : `${a.slice(0, 6)}…${a.slice(-4)}`);
 
+  const grpOf = (v: View): "live" | "open" | "join" | "done" => (v.status >= 3 ? "done" : v.status === 2 ? "live" : v.mine ? "open" : "join");
+  const counts = { live: 0, open: 0, join: 0, done: 0 };
+  views.forEach((v) => { counts[grpOf(v)] += 1; });
+  const effTab: "live" | "open" | "join" | "done" = secTab !== "auto" ? secTab : counts.live ? "live" : counts.open ? "open" : counts.join ? "join" : counts.done ? "done" : "live";
+  const shown = views.filter((v) => grpOf(v) === effTab);
+
   const share = async (v: View) => {
     const url = `${window.location.origin}/?ajo=${v.id}`;
     const text = `Join "${v.name}" on Cowrie: ${cusd(v.contribution)} each round.`;
@@ -400,10 +408,22 @@ export default function OnchainAjo({
       )}
 
       {focusId && loaded && !views.some((x) => x.id === focusId) && (<div className="ds" style={{ marginBottom: 8 }}>Circle #{focusId} is not open to you. It may be invite-only, full or already running.</div>)}
-      {views.length === 0 ? (
-        <p className="muted" style={{ marginTop: 2 }}>{loaded ? "No on-chain circles yet. Start one, or wait for a friend to start one you can join." : "Loading your circles..."}</p>
+      {loaded && (
+        <div className="ds" style={{ margin: "0 0 8px", fontWeight: 600 }}>
+          {counts.live ? `${counts.live} live circle${counts.live === 1 ? "" : "s"} right now` : "No live circle right now"}
+          {counts.open ? ` · ${counts.open} waiting to start` : ""}
+          {counts.join ? ` · ${counts.join} you can join` : ""}
+        </div>
+      )}
+      <div className="posacts" style={{ marginBottom: 10 }}>
+        {([["live", "Live"], ["open", "Open"], ["join", "Join"], ["done", "Completed"]] as ["live" | "open" | "join" | "done", string][]).map(([k, lab]) => (
+          <button key={k} className={"mini " + (effTab === k ? "pay" : "ghost")} onClick={() => setSecTab(k)}>{lab} {counts[k]}</button>
+        ))}
+      </div>
+      {shown.length === 0 ? (
+        <p className="muted" style={{ marginTop: 2 }}>{loaded ? (views.length ? "Nothing here right now. Try another tab above." : "No on-chain circles yet. Start one, or wait for a friend to start one you can join.") : "Loading your circles..."}</p>
       ) : (
-        views.map((v) => {
+        shown.map((v) => {
           const left = v.endsAt - Math.floor(Date.now() / 1000);
           const collector = v.order[v.round - 1];
           return (

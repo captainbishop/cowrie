@@ -205,7 +205,9 @@ async function llmParse(text: string, name: string, lang: string, history: { rol
   const asTranscript = !explicit && looksEnglish && history.length > 0;
   const transcript = asTranscript ? ` RECENT CONVERSATION, for facts only (what was said, sent or paid). Use it to answer, but reply in English whatever language it is in:\n${history.map((m) => `${m.role === "user" ? "User" : "Cowrie"}: ${m.content}`).join("\n")}` : "";
   const histForCall = asTranscript ? [] : history;
-  const messages = [{ role: "system", content: SYS.replace("{{name}}", name) + langLine + ctx + transcript }, ...histForCall, { role: "user", content: text + tag }];
+  const CIRCLE_WORD: Record<string, string> = { Igbo: "esusu", Hausa: "adashe" };
+  const termLine = explicit && CIRCLE_WORD[lang] ? ` VOCABULARY: when you write in ${lang}, call a rotating savings circle "${CIRCLE_WORD[lang]}", not "ajo". Keep the word "Ajo" only when you name the app's Ajo sheet or button, which is labelled "Ajo circle".` : "";
+  const messages = [{ role: "system", content: SYS.replace("{{name}}", name) + langLine + termLine + ctx + transcript }, ...histForCall, { role: "user", content: text + tag }];
   const mk = (m: string) => JSON.stringify({ model: m, temperature: 0.5, max_tokens: 700, messages });
   const primary = await callLLM(base, key, mk(model));
   if (primary) return primary;
