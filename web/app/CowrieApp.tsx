@@ -4,7 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
-import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -141,6 +141,9 @@ export default function CowrieApp() {
   const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null>(null);
+  const [ajoCmd, setAjoCmd] = useState<AjoCommand | null>(null);
+  const [ajoExec, setAjoExec] = useState<AjoExec | null>(null);
+  const ajoPending = useRef<AjoPending | null>(null);
   const [notes, setNotes] = useState<{ id: string; title: string; body: string; ts: number; read?: boolean }[]>([]);
   const curSid = useRef<string>(Date.now().toString(36));
   const [cName, setCName] = useState("");
@@ -644,6 +647,21 @@ export default function CowrieApp() {
   async function handle(override?: string) {
     const text = (typeof override === "string" ? override : input).trim();
     if (!text || busy) return;
+    const pend = ajoPending.current;
+    if (pend) {
+      if (Date.now() > pend.until) ajoPending.current = null;
+      else if (/^\s*(yes|yeah|yep|yup|sure|ok|okay|confirm|do it|go ahead)\b/i.test(text)) {
+        setInput(""); say({ who: "you", text });
+        ajoPending.current = null;
+        setAjoExec({ kind: pend.kind, id: pend.id, stamp: Date.now() });
+        return;
+      } else if (/^\s*(no|nope|not now|cancel|stop|leave it)\b/i.test(text)) {
+        setInput(""); say({ who: "you", text });
+        ajoPending.current = null;
+        say({ who: "cowrie", text: "Okay, I will not do it. Ask me any time." });
+        return;
+      } else ajoPending.current = null;
+    }
     if (awaitingName.current) {
       if (/\d|0x/i.test(text) || text.split(/\s+/).length > 4) awaitingName.current = false;
       else {
@@ -740,6 +758,10 @@ export default function CowrieApp() {
           say({ who: "cowrie", tone: "good", text: `Set, ${firstName}. Guardian is watching ${key} on Chainlink${now ? ` (now about $${Math.round(now).toLocaleString()})` : ""} and will ${doing} the moment it goes ${g.op} $${g.price.toLocaleString()}. Find it under Activity, Guardian.` });
         }
       }
+      else if (it.action === "ajoDo") {
+        const w = ["pay", "join", "withdraw", "move", "status"].includes(String(it.what)) ? String(it.what) : "status";
+        setAjoCmd({ what: w as AjoCommand["what"], name: it.name ? String(it.name) : undefined, stamp: Date.now() });
+      }
       else if (it.action === "ajo") {
         { const fromCur = (CURRENCIES[(it.currency && it.currency !== "AUTO" ? it.currency : ccy)] || CURRENCIES.NGN).perUsd; const toCur = (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd; const a0 = it.amount && Number(it.amount) > 0 ? (Number(it.amount) / fromCur) * toCur : undefined; setAjoPrefill({ name: it.name ? String(it.name) : undefined, amount: a0, minutes: typeof it.minutes === "number" && it.minutes > 0 ? it.minutes : undefined, invitees: Array.isArray(it.members) ? it.members.map((x: unknown) => String(x)) : [], stamp: Date.now() }); }
         setHomePanel("ajo"); setTab("home");
@@ -806,6 +828,7 @@ export default function CowrieApp() {
           <div className="word">Cowrie</div>
           <span className="chain">on Monad</span>
           <div className="spacer" />
+          {authenticated && addr && (<AjoAgent addr={addr as `0x${string}`} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} errText={txErr} fmt={cfmt} spendable={spendable} book={book} say={say} notify={notify} setPending={(p: AjoPending | null) => { ajoPending.current = p; }} command={ajoCmd} exec={ajoExec} refresh={refresh} />)}
           {authenticated && (<button className="iconbtn bell" onClick={() => setTab("alerts")} aria-label="Notifications"><Icon size={17}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></Icon>{(alertCount + unread) > 0 && <span className="badge">{alertCount + unread}</span>}</button>)}
           {addr && (
             <button className="addrchip" onClick={copyAddr} title="Copy your wallet address" aria-label="Copy address">
