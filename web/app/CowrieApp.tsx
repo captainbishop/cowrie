@@ -216,7 +216,7 @@ export default function CowrieApp() {
           publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "earnPrincipal", args: [addr] }),
         ]);
         setEarned(en as bigint); setEarnP(ep as bigint);
-      } catch { setEarned(0n); setEarnP(0n); }
+      } catch { /* keep the last good Earn value */ }
       try {
         const entries = await Promise.all(assets.map(async (as) => {
           const [hold, val, pc, pt] = await Promise.all([
@@ -232,11 +232,14 @@ export default function CowrieApp() {
       try {
         const mc = Number(await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "marketsCount", args: [] }));
         const ms: { id: number; question: string; resolved: boolean; outcome: boolean; poolYes: bigint; poolNo: bigint; yes: bigint; no: bigint }[] = [];
-        for (let i = 0; i < mc; i++) {
-          const mk = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "markets", args: [BigInt(i)] })) as readonly [string, bigint, boolean, boolean, bigint, bigint];
-          const pos = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "predictionOf", args: [BigInt(i), addr] })) as readonly [bigint, bigint];
-          ms.push({ id: i, question: mk[0], resolved: mk[2], outcome: mk[3], poolYes: mk[4], poolNo: mk[5], yes: pos[0], no: pos[1] });
-        }
+        const rows = await Promise.all(Array.from({ length: mc }, async (_, i) => {
+          const [mk, pos] = (await Promise.all([
+            publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "markets", args: [BigInt(i)] }),
+            publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "predictionOf", args: [BigInt(i), addr] }),
+          ])) as [readonly [string, bigint, boolean, boolean, bigint, bigint], readonly [bigint, bigint]];
+          return { id: i, question: mk[0], resolved: mk[2], outcome: mk[3], poolYes: mk[4], poolNo: mk[5], yes: pos[0], no: pos[1] };
+        }));
+        ms.push(...rows);
         setMarkets(ms);
       } catch {}
     } catch {}
