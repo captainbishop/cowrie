@@ -71,7 +71,7 @@ export default function AjoAgent(props: Props) {
     [publicClient],
   );
 
-  const snapshot = useCallback(async () => {
+  const snapshotOnce = useCallback(async () => {
     const [b, countRaw] = await Promise.all([
       publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] }),
       read("circleCount", []),
@@ -111,6 +111,11 @@ export default function AjoAgent(props: Props) {
     );
     return { snaps: rows.filter((x): x is Snap => x !== null), bal: b as bigint };
   }, [addr, publicClient, read, me]);
+
+  // One retry, because the public test network sometimes drops a request.
+  const snapshot = useCallback(async () => {
+    try { return await snapshotOnce(); } catch { await new Promise((r) => setTimeout(r, 1200)); return await snapshotOnce(); }
+  }, [snapshotOnce]);
 
   const who = (a: string) => {
     if (a.toLowerCase() === me) return "you";
@@ -195,7 +200,7 @@ export default function AjoAgent(props: Props) {
       } catch {}
     };
     tick();
-    const t = setInterval(tick, 15000);
+    const t = setInterval(tick, 30000);
     return () => { on = false; clearInterval(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addr, snapshot]);
@@ -268,7 +273,7 @@ export default function AjoAgent(props: Props) {
           say({ who: "cowrie", text: `Move ${fmt(bal)} from your wallet to your spendable balance?`, options: ["Yes, move it", "Not now"] });
         }
       } catch (e) {
-        say({ who: "cowrie", tone: "bad", text: errText(e) });
+        say({ who: "cowrie", tone: "bad", text: `I could not read your Ajo circles just now, so nothing was changed. (${String((e as { shortMessage?: string })?.shortMessage || (e as Error)?.message || e).slice(0, 140)})` });
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

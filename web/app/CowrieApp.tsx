@@ -144,6 +144,21 @@ export default function CowrieApp() {
   const [ajoCmd, setAjoCmd] = useState<AjoCommand | null>(null);
   const [ajoExec, setAjoExec] = useState<AjoExec | null>(null);
   const ajoPending = useRef<AjoPending | null>(null);
+  const [linkCircle, setLinkCircle] = useState<number | null>(null);
+  // A shared join link (?ajo=3) opens the Ajo sheet on that circle, even after sign-in.
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get("ajo");
+      if (q && /^\d+$/.test(q)) sessionStorage.setItem("cowrie.joinlink", q);
+      const stored = sessionStorage.getItem("cowrie.joinlink");
+      if (stored) setLinkCircle(Number(stored));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (!authenticated || !linkCircle) return;
+    setHomePanel("ajo"); setTab("home");
+    try { sessionStorage.removeItem("cowrie.joinlink"); } catch {}
+  }, [authenticated, linkCircle]);
   const [notes, setNotes] = useState<{ id: string; title: string; body: string; ts: number; read?: boolean }[]>([]);
   const curSid = useRef<string>(Date.now().toString(36));
   const [cName, setCName] = useState("");
@@ -317,7 +332,7 @@ export default function CowrieApp() {
       } catch {}
     };
     check();
-    const t = setInterval(check, 20000);
+    const t = setInterval(check, 40000);
     return () => { on = false; clearInterval(t); };
   }, [addr]);
   useEffect(() => { const el = taRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 140) + "px"; el.style.overflowY = el.scrollHeight > 140 ? "auto" : "hidden"; }, [input]);
@@ -886,7 +901,7 @@ export default function CowrieApp() {
             {homePanel === "ajo" && (
               <div className="sheet">
                 <div className="sheethead"><span>Ajo circle</span><button className="xbtn" aria-label="Close" onClick={() => setHomePanel(null)}>✕</button></div>
-                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} book={book} prefill={ajoPrefill} />
+                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} book={book} prefill={ajoPrefill} focusId={linkCircle} />
                 {true ? null : ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; const mine = recipient.name === (firstName || "You"); const daysLeft = c.nextISO ? Math.ceil((new Date(c.nextISO).getTime() - Date.now()) / 86400000) : null; const due = daysLeft !== null && daysLeft <= 0; return (
                   <div className="pcard" key={c.id}>
                     <div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{c.name}</b><small>{amtStr(c.amount, c.currency)} each · {c.members.length} people · cycle {Math.min(c.round + 1, c.members.length)}/{c.members.length}</small></span><button className="iconbtn" aria-label="Remove" onClick={() => removeAjo(c.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></div>

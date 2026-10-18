@@ -13,6 +13,7 @@ const tokenAbi = parseAbi([
 ]);
 
 const MAX = 2n ** 256n - 1n;
+const UNIT_SECONDS: Record<string, number> = { minutes: 60, hours: 3600, days: 86400, weeks: 604800, months: 2592000 };
 const vaultDepositAbi = parseAbi(["function deposit(uint256 amount)"]);
 // Remembers the last answer so the sheet shows your circles immediately when you reopen it.
 const CACHE = new Map<string, { views: View[]; bal: bigint }>();
@@ -72,6 +73,7 @@ export default function OnchainAjo({
   spendable,
   book,
   prefill,
+  focusId,
 }: {
   addr?: `0x${string}`;
   publicClient: any;
@@ -87,6 +89,7 @@ export default function OnchainAjo({
   spendable: bigint;
   book: { name: string; address: string }[];
   prefill: { name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null;
+  focusId: number | null;
 }) {
   const cusd = (v: bigint) => fmt(v);
   const [views, setViews] = useState<View[]>(() => CACHE.get((addr || "").toLowerCase())?.views ?? []);
@@ -97,7 +100,8 @@ export default function OnchainAjo({
   const [fName, setFName] = useState("Family Ajo");
   const [fAmt, setFAmt] = useState(String(Math.round(10 * perUsd)));
   const [fMult, setFMult] = useState("2");
-  const [fMins, setFMins] = useState("5");
+  const [fLen, setFLen] = useState("5");
+  const [fUnit, setFUnit] = useState("minutes");
   const [fSize, setFSize] = useState("3");
   const [fInvite, setFInvite] = useState(true);
   const [picked, setPicked] = useState<string[]>([]);
@@ -108,7 +112,12 @@ export default function OnchainAjo({
   useEffect(() => {
     if (!prefill) return;
     if (prefill.name) setFName(prefill.name);
-    if (prefill.minutes && prefill.minutes > 0) setFMins(String(prefill.minutes));
+    if (prefill.minutes && prefill.minutes > 0) {
+      const m = prefill.minutes;
+      const pair: [number, string] = m % 43200 === 0 ? [m / 43200, "months"] : m % 10080 === 0 ? [m / 10080, "weeks"] : m % 1440 === 0 ? [m / 1440, "days"] : m % 60 === 0 ? [m / 60, "hours"] : [m, "minutes"];
+      setFLen(String(pair[0]));
+      setFUnit(pair[1]);
+    }
     if (prefill.amount && prefill.amount > 0) setFAmt(String(Math.round(prefill.amount)));
     const wanted = (prefill.invitees || []).map((n) => n.toLowerCase());
     const found = book
@@ -141,6 +150,7 @@ export default function OnchainAjo({
       const nowSec = Math.floor(Date.now() / 1000);
       const ids: number[] = [];
       for (let i = count; i >= 1 && ids.length < 8; i--) ids.push(i);
+      if (focusId && focusId <= count && !ids.includes(focusId)) ids.push(focusId);
       const rows = await Promise.all(
         ids.map(async (i): Promise<View | null> => {
           const id = BigInt(i);
@@ -182,11 +192,11 @@ export default function OnchainAjo({
     } finally {
       setLoaded(true);
     }
-  }, [addr, publicClient, read, me]);
+  }, [addr, publicClient, read, me, focusId]);
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 12000);
+    const t = setInterval(load, 25000);
     return () => clearInterval(t);
   }, [load]);
 
@@ -254,7 +264,7 @@ export default function OnchainAjo({
       const mult = BigInt(Math.max(1, Math.floor(Number(fMult) || 1)));
       const deposit = contribution * mult;
       const size = Math.floor(Number(fSize));
-      const period = Math.round(Number(fMins) * 60);
+      const period = Math.round((Number(fLen) || 0) * (UNIT_SECONDS[fUnit] || 60));
       if (!fName.trim()) throw new Error("Give the circle a name.");
       if (contribution <= 0n) throw new Error("Enter an amount per round.");
       if (!(size >= 2 && size <= 20)) throw new Error("A circle needs 2 to 20 members.");
@@ -295,6 +305,15 @@ export default function OnchainAjo({
 
   const who = (a: string) => (a.toLowerCase() === me ? "You" : `${a.slice(0, 6)}…${a.slice(-4)}`);
 
+  const share = async (v: View) => {
+    const url = `${window.location.origin}/?ajo=${v.id}`;
+    const text = `Join "${v.name}" on Cowrie: ${cusd(v.contribution)} each round.`;
+    try {
+      if (navigator.share) { await navigator.share({ title: "Cowrie Ajo", text, url }); return; }
+    } catch { return; }
+    try { await navigator.clipboard.writeText(url); flash("Link copied"); } catch { flash(url); }
+  };
+
   if (!AJO_ADDRESS) return <p className="muted">On-chain Ajo is not set up yet. Add NEXT_PUBLIC_AJO_CIRCLE to web/.env.local.</p>;
   if (!addr) return null;
 
@@ -316,7 +335,7 @@ export default function OnchainAjo({
               ["Circle name", fName, setFName],
               [`Each member pays per round (${symbol})`, fAmt, setFAmt],
               ["Security deposit, as a multiple of one payment (1 or more)", fMult, setFMult],
-              ["Round length in minutes", fMins, setFMins],
+              
               ["Number of members (2 to 20)", fSize, setFSize],
             ] as [string, string, (v: string) => void][]
           ).map(([label, value, set]) => (
@@ -325,6 +344,24 @@ export default function OnchainAjo({
               <input value={value} onChange={(e) => set(e.target.value)} style={inputStyle} />
             </label>
           ))}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, marginBottom: 4 }}>How long is each round?</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+              {([["Daily", 1, "days"], ["Weekly", 1, "weeks"], ["Every 2 weeks", 2, "weeks"], ["Monthly", 1, "months"]] as [string, number, string][]).map(([lab, n, u]) => (
+                <button key={lab} className={"ajochip" + (fLen === String(n) && fUnit === u ? " on" : "")} style={{ cursor: "pointer", font: "inherit" }} onClick={() => { setFLen(String(n)); setFUnit(u); }}>{lab}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <input value={fLen} onChange={(e) => setFLen(e.target.value)} style={{ ...inputStyle, flex: 1, marginTop: 0 }} />
+              <select value={fUnit} onChange={(e) => setFUnit(e.target.value)} style={{ ...inputStyle, flex: 1, marginTop: 0 }}>
+                <option value="minutes">minutes</option>
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+                <option value="weeks">weeks</option>
+                <option value="months">months</option>
+              </select>
+            </div>
+          </div>
           <div style={{ margin: "4px 0 10px" }}>
             <div className="seg" style={{ marginBottom: 8 }}>
               <button className={fInvite ? "on" : ""} onClick={() => setFInvite(true)}>Invite-only</button>
@@ -362,6 +399,7 @@ export default function OnchainAjo({
         </div>
       )}
 
+      {focusId && loaded && !views.some((x) => x.id === focusId) && (<div className="ds" style={{ marginBottom: 8 }}>Circle #{focusId} is not open to you. It may be invite-only, full or already running.</div>)}
       {views.length === 0 ? (
         <p className="muted" style={{ marginTop: 2 }}>{loaded ? "No on-chain circles yet. Start one, or wait for a friend to start one you can join." : "Loading your circles..."}</p>
       ) : (
@@ -413,6 +451,7 @@ export default function OnchainAjo({
                     )}
                   </>
                 )}
+                {v.mine && v.status === 0 && (<div className="posacts" style={{ marginTop: 8 }}><button className="mini pay" onClick={() => share(v)}>Share link</button></div>)}
                 {v.mine && v.myStrikes > 0 && <div className="ds" style={{ marginTop: 6 }}>Missed payments: {v.myStrikes}</div>}
               </div>
             </div>

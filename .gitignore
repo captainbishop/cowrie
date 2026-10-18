@@ -16,3 +16,4 @@ web/.next
 .demo-phase
 *.tsbuildinfo
 .who
+README-preview.html
