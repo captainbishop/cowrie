@@ -148,6 +148,7 @@ export default function CowrieApp() {
   const endRef = useRef<HTMLDivElement>(null);
   const awaitingName = useRef(false);
   const askedName = useRef(false);
+  const [nameReady, setNameReady] = useState(false);
   const seenIn = useRef<Set<string> | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
 
@@ -335,16 +336,18 @@ export default function CowrieApp() {
       } catch {}
     })();
   }, [addr, configured]);
-  useEffect(() => { if (authenticated && configured && !greeted.current) { greeted.current = true; const h = new Date().getHours(); const tod = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; setThread((t) => (t.length ? t : [{ who: "cowrie", text: pick([`${tod}, ${firstName}. Your money's ready, tell me what to do, or tap a suggestion.`, `${tod}, ${firstName}. What should we do with your money today?`]) }])); } }, [authenticated, configured, firstName]);
+  useEffect(() => { if (authenticated && configured && nameReady && !greeted.current) { greeted.current = true; const h = new Date().getHours(); const tod = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; setThread((t) => (t.length ? t : [{ who: "cowrie", text: pick([`${tod}, ${firstName}. Your money's ready, tell me what to do, or tap a suggestion.`, `${tod}, ${firstName}. What should we do with your money today?`]) }])); } }, [authenticated, configured, firstName, nameReady]);
   // First time on this device: ask what Cowrie should call the user, instead of using the email name.
   useEffect(() => {
     if (!authenticated || !addr || !configured || askedName.current) return;
     askedName.current = true;
     let saved = "";
     try { saved = localStorage.getItem("cowrie.nick." + addr) || ""; } catch {}
-    if (saved) return;
+    if (saved) { setNameReady(true); return; }
     awaitingName.current = true;
-    setThread((t) => [...t, { who: "cowrie", text: "Before we start, what should I call you? A first name or a nickname is fine, and you can change it any time in Settings." }]);
+    const hr = new Date().getHours();
+    const tod = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
+    setThread((t) => [...t, { who: "cowrie", text: `${tod}. Before we start, what should I call you? A first name or a nickname is fine, and you can change it any time in Settings.` }]);
   }, [authenticated, addr, configured]);
   useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
