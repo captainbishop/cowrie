@@ -6,7 +6,7 @@ export const ajoAbi = abiJson as any;
 
 export const AJO_ADDRESS = (process.env.NEXT_PUBLIC_AJO_CIRCLE || "") as `0x${string}`;
 
-export const AJO_STATUS = ["Open", "Full", "Active", "Completed", "Cancelled"] as const;
+export const AJO_STATUS = ["Open", "Full", "Active", "Completed", "Cancelled", "Ended"] as const;
 
 export type OnchainCircle = {
   id: number;

@@ -8,7 +8,7 @@ async function main() {
   const { ethers } = hre;
   const dep = JSON.parse(fs.readFileSync("deployments.json", "utf8"));
   const token = await ethers.getContractAt("MockUSD", dep.MockUSD);
-  const ajo = await ethers.getContractAt("AjoCircle", dep.AjoCircle);
+  const ajo = await ethers.getContractAt("AjoCircleV2", dep.AjoCircleV2);
   const keys = JSON.parse(fs.readFileSync(".demo-wallets.json", "utf8"));
   const wallets = keys.map((k) => new ethers.Wallet(k, ethers.provider));
   const names = ["Wallet A", "Wallet B"];
@@ -27,7 +27,7 @@ async function main() {
         if (await ajo.isMember(id, w.address)) continue;
         try {
           await (await token.mint(w.address, 1000n * U)).wait();
-          await (await token.connect(w).approve(dep.AjoCircle, ethers.MaxUint256)).wait();
+          await (await token.connect(w).approve(dep.AjoCircleV2, ethers.MaxUint256)).wait();
           await (await ajo.connect(w).join(id)).wait();
           console.log(`${names[i]} joined circle #${id}.`);
         } catch (e) {
