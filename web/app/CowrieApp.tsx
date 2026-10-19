@@ -346,16 +346,18 @@ export default function CowrieApp() {
     if (!addr || !configured) return;
     (async () => {
       try {
-        const n = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "listedTokensCount", args: [] })) as bigint;
-        const list: { addr: `0x${string}`; symbol: string; decimals: number }[] = [];
-        for (let i = 0n; i < n; i++) {
-          const a = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "listedTokens", args: [i] })) as `0x${string}`;
-          let symbol = a.slice(0, 6); let decimals = 18;
-          try { symbol = (await publicClient.readContract({ address: a, abi: usdAbi, functionName: "symbol", args: [] })) as string; } catch {}
-          try { decimals = Number(await publicClient.readContract({ address: a, abi: usdAbi, functionName: "decimals", args: [] })); } catch {}
-          list.push({ addr: a, symbol, decimals });
-        }
+        try { const cached = localStorage.getItem("cowrie.assets"); if (cached) setAssets(JSON.parse(cached)); } catch {}
+        const n = Number((await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "listedTokensCount", args: [] })) as bigint);
+        const list = await Promise.all(Array.from({ length: n }, async (_, i) => {
+          const a = (await publicClient.readContract({ address: addresses.vault, abi: vaultAbi, functionName: "listedTokens", args: [BigInt(i)] })) as `0x${string}`;
+          const [sym, dec] = await Promise.all([
+            publicClient.readContract({ address: a, abi: usdAbi, functionName: "symbol", args: [] }).catch(() => a.slice(0, 6)),
+            publicClient.readContract({ address: a, abi: usdAbi, functionName: "decimals", args: [] }).catch(() => 18),
+          ]);
+          return { addr: a, symbol: String(sym), decimals: Number(dec) };
+        }));
         setAssets(list);
+        try { localStorage.setItem("cowrie.assets", JSON.stringify(list)); } catch {}
       } catch {}
     })();
   }, [addr, configured]);
@@ -392,6 +394,31 @@ export default function CowrieApp() {
     return () => mq.removeEventListener?.("change", apply);
   }, [theme]);
   const persist = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} };
+
+  // Show the last known portfolio instantly, then let the fresh reads replace it.
+  const snapSer = (v: unknown) => JSON.stringify(v, (_k, x) => (typeof x === "bigint" ? { $b: x.toString() } : x));
+  const snapDe = (t: string) => JSON.parse(t, (_k, x) => (x && typeof x === "object" && "$b" in x ? BigInt((x as { $b: string }).$b) : x));
+  useEffect(() => {
+    if (!addr) return;
+    try {
+      const raw = localStorage.getItem("cowrie.snap." + addr);
+      if (!raw) return;
+      const j = snapDe(raw);
+      if (typeof j.spendable === "bigint") setSpendable(j.spendable);
+      if (typeof j.savings === "bigint") setSavings(j.savings);
+      if (typeof j.earned === "bigint") setEarned(j.earned);
+      if (j.assetData && typeof j.assetData === "object") setAssetData(j.assetData);
+      if (Array.isArray(j.markets)) setMarkets(j.markets);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addr]);
+  useEffect(() => {
+    if (!addr) return;
+    const t = setTimeout(() => {
+      try { localStorage.setItem("cowrie.snap." + addr, snapSer({ spendable, savings, earned, assetData, markets })); } catch {}
+    }, 800);
+    return () => clearTimeout(t);
+  }, [addr, spendable, savings, earned, assetData, markets]);
 
   // Contacts follow the login: saved to the account's database when it is set up, restored on any device.
   const bookSynced = useRef(false);
