@@ -1,14 +1,10 @@
 {
-  "schedule": "0 */10 * * * *",
-  "chainName": "ethereum-mainnet-arbitrum-1",
-  "feeds": [
-    {
-      "name": "BTC/USD",
-      "address": "0x6ce185860a4963106506C203335A2910413708e9"
-    },
-    {
-      "name": "ETH/USD",
-      "address": "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612"
-    }
-  ]
+  "schedule": "0 */1 * * * *",
+  "mainnetChain": "monad-mainnet",
+  "testnetChain": "monad-testnet",
+  "btcFeed": "0x187efD8ba8483105f2735740D956f7CD23723deC",
+  "ajoCircle": "0x0dD979486E6D7c9763CD4DdCf775c269Bb78c4f4",
+  "ajoKeeper": "0x272b18a1a8fE717d74B97f0d241D9dcE76125FEe",
+  "gasLimit": "1500000",
+  "pullGasLimit": "3000000"
 }
