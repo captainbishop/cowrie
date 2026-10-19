@@ -93,6 +93,7 @@ contract AjoCircleV2 is ReentrancyGuard, Ownable {
     mapping(uint256 => mapping(address => bool)) public endVoted;
     mapping(uint256 => uint256) public endVotes;
     mapping(uint256 => uint256) public fallbackBlock;
+    mapping(uint256 => uint8) public pullRound; // last round for which an automatic pull was attempted
 
     event CircleCreated(uint256 indexed id, address indexed creator, string name, uint256 contribution, uint256 deposit, uint64 period, uint64 joinDeadline, uint8 maxMembers, bool inviteOnly);
     event Joined(uint256 indexed id, address indexed member);
@@ -368,7 +369,11 @@ contract AjoCircleV2 is ReentrancyGuard, Ownable {
 
     /// @notice Pull from every opted-in member who has not paid; skips anyone who cannot pay right now.
     function pullAll(uint256 id) external exists(id) {
-        address[] memory m = circles[id].members;
+        Circle storage c = circles[id];
+        require(c.status == Status.Active, "not active");
+        require(pullRound[id] != c.round, "already attempted this round");
+        pullRound[id] = c.round;
+        address[] memory m = c.members;
         for (uint256 i = 0; i < m.length; i++) {
             try this.pullFor(id, m[i]) {} catch {}
         }

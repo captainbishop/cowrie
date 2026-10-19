@@ -189,8 +189,19 @@ describe("AjoCircleV2", () => {
     await expect(ajo.pullFor(id, b.address)).to.be.revertedWith("already paid");
 
     await token.connect(c).approve(ajoAddr, ethers.MaxUint256);
-    await ajo.connect(stranger).pullAll(id);
+    await expect(ajo.connect(stranger).pullAll(id)).to.be.revertedWith("already attempted this round");
+    await ajo.connect(stranger).pullFor(id, c.address);
     expect(await ajo.paid(id, 1, c.address)).to.equal(true);
+  });
+
+  it("only attempts the automatic pull once per round", async () => {
+    const ctx = await loadFixture(deploy);
+    const { ajo, b, stranger } = ctx;
+    const id = await active(ctx);
+    await ajo.connect(b).setAutopay(id, true);
+    await ajo.connect(stranger).pullAll(id);
+    await expect(ajo.connect(stranger).pullAll(id)).to.be.revertedWith("already attempted this round");
+    expect(Number(await ajo.pullRound(id))).to.equal(1);
   });
 
   it("returns everything the app needs in one call", async () => {
