@@ -18,3 +18,4 @@ web/.next
 .who
 README-preview.html
 chat-test-results.txt
+.fallback-mode

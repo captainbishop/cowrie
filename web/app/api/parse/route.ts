@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const maxDuration = 30;
+
 type Intent =
   | { action: "setAutosave"; percent: number }
   | { action: "setDailyCap"; amount: number; currency: string }
@@ -252,6 +254,27 @@ export async function POST(req: NextRequest) {
     if (startVerb || (hasDetails && !what)) intent = { action: "ajo", name: a0.name, amount: a0.amount, members: a0.members } as unknown as Intent;
     else if (what) intent = { action: "ajoDo", what, name: a0.name } as unknown as Intent;
     else intent = { action: "reply", message: "What would you like to do with your ajo?", options: ["Check my ajo", "Pay my ajo", "Start an ajo"] } as Intent;
+  }
+  // Commands about an ajo must reach the app as actions, even when the AI answered with a plain reply or the word was mistyped.
+  {
+    const t1 = text.toLowerCase();
+    const a1 = intent as { action?: string; name?: string };
+    const ajoWord = /\b(aj+o+|esusu|isusu|susu|adashe|thrift|savings? circle|rotating savings)\b/.test(t1);
+    const startVerb = /\b(start|create|new|begin|set ?up)\b/.test(t1);
+    const learning = /\b(how (does|do|is an?|are)|what (is|are|does)|explain|meaning|why|tell me about)\b/.test(t1) && !/\bmy\b/.test(t1);
+    const w = /\b(withdraw|refund|get back|take out)\b/.test(t1) ? "withdraw"
+      : /\b(move|transfer|send)\b.*\b(spendable|wallet|balance)\b|\bcollect(ed)?\b|\bmy (winnings|pot|payout)\b/.test(t1) ? "move"
+      : /\bjoin\b/.test(t1) ? "join"
+      : /\b(pay|contribute|settle)\b/.test(t1) ? "pay"
+      : /\b(status|how'?s|how is|how far|progress|whose turn|who'?s next|when do i|did i|check|update|what'?s happening|what is happening|any news)\b/.test(t1) ? "status"
+      : "";
+    if (ajoWord && w && !startVerb && !learning && a1.action !== "ajoDo") {
+      intent = { action: "ajoDo", what: w, name: a1.name } as unknown as Intent;
+    }
+  }
+  // If the AI service did not answer, say so instead of pretending the message was not understood.
+  if (!llm && (intent as { action?: string }).action === "reply" && /\bcatch\b/i.test((intent as { message?: string }).message || "")) {
+    (intent as { message?: string }).message = `My thinking service is busy for a moment, ${nm}. Please send that again in a few seconds.`;
   }
   const io = intent as { message?: string; reply?: string; reason?: string };
   if (io.message) io.message = deDash(io.message);
