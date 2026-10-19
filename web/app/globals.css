@@ -265,3 +265,15 @@ body { background:var(--bg-grad); background-attachment:fixed; color:var(--text)
 @media (max-width: 480px), (max-height: 780px) {
   .chips { margin-top: 5px; }
 }
+
+/* Keep content inside the screen edges */
+html, body { max-width: 100%; overflow-x: hidden; }
+.thread { padding-left: 10px; padding-right: 10px; }
+.seg button { padding-left: 10px; padding-right: 10px; }
+
+/* Settings rows and panels must fit the screen width */
+.srow > div:first-child { min-width: 0; flex: 1 1 auto; }
+.seg { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.seg button { white-space: nowrap; padding: 8px 9px; }
+.panel { overflow-x: hidden; }
+.bubble { max-width: 82%; }

@@ -912,7 +912,7 @@ export default function CowrieApp() {
             {earned > 0n && (<button className="earnstrip" onClick={() => setTab("activity")}><span className="ei"><b>{mask(cfmt(earned))} in your Earn vault</b><small>Growing at 10% a year, tap to manage</small></span><span className="earnw">Manage</span></button>)}
             <div className="feats">
               <button className={"feat" + (homePanel === "guardian" ? " on" : "")} onClick={() => setHomePanel(homePanel === "guardian" ? null : "guardian")}><span className="fl">Guardian</span><span className="fv">{clPrices.BTC ? `BTC $${(clPrices.BTC.price / 1000).toFixed(1)}k` : "live via Chainlink"}</span></button>
-              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{ajoSummary ? (ajoSummary.live ? `${ajoSummary.live} live` : ajoSummary.open ? `${ajoSummary.open} open` : ajoSummary.invited ? `${ajoSummary.invited} to join` : "no live circle") : "on-chain, via CRE"}</span></button>
+              <button className={"feat" + (homePanel === "ajo" ? " on" : "")} onClick={() => setHomePanel(homePanel === "ajo" ? null : "ajo")}><span className="fl">Ajo circle</span><span className="fv">{"on-chain, via CRE"}{ajoSummary ? (<><br />{ajoSummary.live ? `${ajoSummary.live} live` : ajoSummary.open ? `${ajoSummary.open} open` : ajoSummary.invited ? `${ajoSummary.invited} to join` : "no live circle"}</>) : null}</span></button>
             </div>
             </>) : (
               <div className="minibar">
