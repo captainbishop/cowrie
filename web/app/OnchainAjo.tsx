@@ -22,7 +22,7 @@ const inputStyle = {
   font: "inherit",
 } as const;
 
-type Detail = { key: string; missed: { round: number; member: string }[] };
+type Detail = { key: string; rounds: { round: number; paid: string[]; missed: string[] }[]; partial: boolean };
 
 export default function OnchainAjo({
   addr, publicClient, run, busy, setBusy, flash, errText, fmt, toU, symbol, perUsd, spendable, book, prefill, focusId, refresh,
@@ -91,13 +91,21 @@ export default function OnchainAjo({
   }, [prefill]);
 
   const who = (a: string) => (a.toLowerCase() === me ? "you" : book.find((b) => b.address.toLowerCase() === a.toLowerCase())?.name || `${a.slice(0, 6)}...${a.slice(-4)}`);
-  const keyOf = (c: Circle) => `${c.status}-${c.round}-${c.myStrikes}`;
+  const keyOf = (c: Circle) => `${c.status}-${c.round}`;
+  const settledOf = (c: Circle) => (c.status === 3 ? c.members.length : c.status === 2 || c.status === 5 ? c.round - 1 : 0);
+  const nameIn = (c: Circle, a: string) => {
+    if (a.toLowerCase() === me) return "you";
+    const k = book.find((b) => b.address.toLowerCase() === a.toLowerCase());
+    if (k) return k.name;
+    return `Member ${c.members.findIndex((m) => m.toLowerCase() === a.toLowerCase()) + 1}`;
+  };
 
   async function loadDetails(c: Circle) {
-    const settled = c.status === 3 ? c.members.length : c.status === 2 || c.status === 5 ? c.round - 1 : 0;
+    const settled = settledOf(c);
     const key = keyOf(c);
-    if (settled <= 0) { setDetails((d) => ({ ...d, [c.id]: { key, missed: [] } })); return; }
-    const subset = c.members.length * settled <= 80 ? c.members : c.members.filter((m) => m.toLowerCase() === me);
+    if (settled <= 0) { setDetails((d) => ({ ...d, [c.id]: { key, rounds: [], partial: false } })); return; }
+    const partial = c.members.length * settled > 80;
+    const subset = partial ? c.members.filter((m) => m.toLowerCase() === me) : c.members;
     const reads: Promise<{ round: number; member: string; paid: boolean }>[] = [];
     for (let r = 1; r <= settled; r++) {
       for (const m of subset) {
@@ -105,18 +113,13 @@ export default function OnchainAjo({
       }
     }
     const res = await Promise.all(reads);
-    setDetails((d) => ({ ...d, [c.id]: { key, missed: res.filter((x) => !x.paid).map((x) => ({ round: x.round, member: x.member })) } }));
+    const rounds = Array.from({ length: settled }, (_, i) => ({
+      round: i + 1,
+      paid: res.filter((x) => x.round === i + 1 && x.paid).map((x) => x.member),
+      missed: res.filter((x) => x.round === i + 1 && !x.paid).map((x) => x.member),
+    }));
+    setDetails((d) => ({ ...d, [c.id]: { key, rounds, partial } }));
   }
-  useEffect(() => {
-    circles.forEach((c) => {
-      const d = details[c.id];
-      if (c.isMember && c.myStrikes > 0 && c.status >= 2 && (!d || d.key !== keyOf(c)) && !loadingDetail.current.has(c.id)) {
-        loadingDetail.current.add(c.id);
-        loadDetails(c).catch(() => {}).finally(() => loadingDetail.current.delete(c.id));
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [circles]);
 
   async function act(okMsg: string, fn: () => Promise<boolean | void>) {
     if (busy) return;
@@ -241,6 +244,7 @@ export default function OnchainAjo({
   };
 
   const card = (c: Circle) => {
+    const who = (a: string) => nameIn(c, a);
     const n = c.members.length;
     const collector = c.order[c.round - 1] || "";
     const iAmCollector = collector.toLowerCase() === me;
@@ -324,13 +328,35 @@ export default function OnchainAjo({
             </>
           )}
 
-          {c.isMember && c.status >= 2 && c.myStrikes > 0 && (
+          {c.isMember && c.myStrikes > 0 && (
             <div className="ds" style={{ marginTop: 8 }}>
-              <b>Missed payments</b>
-              {det && det.missed.length > 0
-                ? det.missed.map((x, i) => (<div key={i}>Round {x.round}: {who(x.member)} missed the payment. Up to {fmt(c.contribution)} was taken from {x.member.toLowerCase() === me ? "your" : "their"} deposit.</div>))
-                : <div>You missed {c.myStrikes} payment{c.myStrikes === 1 ? "" : "s"}. Up to {fmt(c.contribution)} each was taken from your deposit. Checking which round...</div>}
+              You missed {c.myStrikes} payment{c.myStrikes === 1 ? "" : "s"} in this circle. Each one was covered from your deposit (up to {fmt(c.contribution)}).
             </div>
+          )}
+          {settledOf(c) > 0 && (
+            <details style={{ marginTop: 8 }} onToggle={(e) => {
+              if ((e.currentTarget as HTMLDetailsElement).open && !loadingDetail.current.has(c.id) && (!details[c.id] || details[c.id].key !== keyOf(c))) {
+                loadingDetail.current.add(c.id);
+                loadDetails(c).catch(() => {}).finally(() => loadingDetail.current.delete(c.id));
+              }
+            }}>
+              <summary className="ds" style={{ cursor: "pointer", fontWeight: 600 }}>Payment history</summary>
+              {!det || det.key !== keyOf(c) ? <div className="ds" style={{ marginTop: 6 }}>Loading...</div> : (
+                <div style={{ marginTop: 6 }}>
+                  {det.rounds.map((r) => {
+                    const total = det.partial ? 1 : c.members.length;
+                    const collector = c.order[r.round - 1];
+                    return (
+                      <div key={r.round} className="ds" style={{ display: "flex", justifyContent: "space-between", gap: 8, padding: "4px 0", borderTop: "1px solid var(--border)" }}>
+                        <span>Round {r.round}{collector ? ` · ${who(collector)} collected` : ""}</span>
+                        <span>{det.partial ? (r.missed.length ? "You missed" : "You paid ✓") : r.missed.length === 0 ? `All ${total} paid ✓` : `${r.paid.length} of ${total} paid · missed: ${r.missed.map((m) => who(m)).join(", ")}`}</span>
+                      </div>
+                    );
+                  })}
+                  {det.partial && <div className="ds">Large circle: showing your own payments only.</div>}
+                </div>
+              )}
+            </details>
           )}
 
           {c.isMember && c.status <= 2 && (

@@ -277,3 +277,6 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .seg button { white-space: nowrap; padding: 8px 9px; }
 .panel { overflow-x: hidden; }
 .bubble { max-width: 82%; }
+
+/* Receipts and summaries keep their line breaks */
+.bubble { white-space: pre-line; }

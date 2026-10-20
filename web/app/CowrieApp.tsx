@@ -4,7 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
-import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { detectBill, billStart, billNext, billReceipt } from "../lib/bills"; import type { BillState, BillSay } from "../lib/bills"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -145,6 +145,8 @@ export default function CowrieApp() {
   const [ajoSummary, setAjoSummary] = useState<{ live: number; open: number; invited: number; done: number } | null>(null);
   const [ajoExec, setAjoExec] = useState<AjoExec | null>(null);
   const ajoPending = useRef<AjoPending | null>(null);
+  const billFlow = useRef<BillState | null>(null);
+  const billAt = useRef(0);
   const [linkCircle, setLinkCircle] = useState<number | null>(null);
   // A shared join link (?ajo=3) opens the Ajo sheet on that circle, even after sign-in.
   useEffect(() => {
@@ -571,6 +573,42 @@ export default function CowrieApp() {
     if (rcpt.status === "reverted") throw new Error("reverted on-chain");
     return hash as string;
   }
+  // ---- Bill payments: a guided, confirmed flow (the biller is a demo, the test money is real on Monad testnet) ----
+  function billSayAll(list: BillSay[]) { list.forEach((m) => say({ who: "cowrie", text: m.text, tone: m.tone, options: m.options })); }
+  function billRun(out: ReturnType<typeof billStart>) {
+    billFlow.current = out.state;
+    billSayAll(out.say);
+    if (out.later && out.later.length) { const later = out.later; setTimeout(() => billSayAll(later), out.delayMs || 900); }
+  }
+  function startBill(kind: Parameters<typeof billStart>[0]) { billAt.current = Date.now(); billRun(billStart(kind)); }
+  async function billInput(text: string) {
+    const st = billFlow.current;
+    if (!st) return;
+    const out = billNext(st, text);
+    billRun(out);
+    if (out.pay && out.state) await billPay(out.state, out.pay);
+  }
+  async function billPay(st: BillState, pay: { naira: number; title: string; desc: string }) {
+    const units = toUnits(pay.naira, "NGN");
+    if (units > spendable) {
+      say({ who: "cowrie", tone: "bad", text: `You have ${cfmt(spendable)} to spend right now, ${firstName}, and this bill is ${amtStr(pay.naira, "NGN")}. Add money or choose a smaller amount.` });
+      billFlow.current = { ...st, step: "confirm" };
+      return;
+    }
+    setBusy(true);
+    try {
+      const h = await run("send", [MERCHANT, units], { description: pay.desc, successHeader: "Paid", title: pay.title });
+      logTx({ hash: h, title: pay.title, amount: amtStr(pay.naira, "NGN"), sign: "neg" });
+      billFlow.current = null;
+      say({ who: "cowrie", tone: "good", text: billReceipt(st, h) });
+      await refresh();
+    } catch (e) {
+      billFlow.current = { ...st, step: "confirm" };
+      say({ who: "cowrie", tone: "bad", text: `${txErr(e)} Nothing was paid. Say "pay" to try again, or "cancel".` });
+    } finally {
+      setBusy(false);
+    }
+  }
   function txErr(e: unknown) { const msg = (e as { shortMessage?: string; message?: string })?.shortMessage || (e as Error)?.message || "something went wrong"; if (/abort|timed? ?out|timeout/i.test(msg)) return `That took longer than expected, ${firstName}. Mind trying again?`; if (/insufficient funds/i.test(msg)) return `Your wallet's out of MON for gas, ${firstName}. Top it up and I'll try again.`; if (/user rejected|denied|rejected the request/i.test(msg)) return `No problem,I cancelled that. Nothing left your wallet.`; if (/reverted/i.test(msg)) return `That didn't go through, ${firstName}, it reverted on-chain. Your balance might be short, or the pool or market isn't ready yet. Want to try again?`; if (/rpc|request failed|http|fetch|network|connection|econn|socket|timeout|gateway|50[0-9]|429/i.test(msg)) return `The Monad network didn't answer that time, ${firstName}. Nothing left your wallet, give it a moment and try again.`; return `That didn't go through: ${msg.slice(0, 110)}. Want to try again?`; }
   async function payContact(address: string, name: string, n: number) {
     if (busy || n <= 0) return;
@@ -694,6 +732,11 @@ export default function CowrieApp() {
   async function handle(override?: string) {
     const text = (typeof override === "string" ? override : input).trim();
     if (!text || busy) return;
+    if (billFlow.current) {
+      if (Date.now() - billAt.current > 900000) billFlow.current = null;
+      else { setInput(""); say({ who: "you", text }); billAt.current = Date.now(); await billInput(text); return; }
+    }
+    { const bk = detectBill(text); if (bk) { setInput(""); say({ who: "you", text }); startBill(bk); return; } }
     const pend = ajoPending.current;
     if (pend) {
       if (Date.now() > pend.until) ajoPending.current = null;
@@ -735,7 +778,8 @@ export default function CowrieApp() {
       const amt = (n: number) => amtStr(n, c);
       if (it.action === "reply") { if (it.remember) remember(it.remember); say({ who: "cowrie", text: it.message || it.text || it.reply || "Okay.", options: Array.isArray(it.options) ? it.options.slice(0, 4) : undefined }); }
       else if (it.action === "discover") { say({ who: "cowrie", text: `It all lives right here in Cowrie, ${firstName}, no leaving the app. You can grow money in the Earn vault, swap into cBTC, cETH or cGOLD, send, or pay a bill. What would you like to do?` }); }
-      else if (it.action === "earn") { const units = toUnits(it.amount || 0, c); if (!it.amount || units <= 0n) { say({ who: "cowrie", text: `How much would you like to move into earning, ${firstName}?`, options: ["Earn ₦10,000", "Earn ₦50,000", "Earn ₦100,000", "Another amount"] }); } else if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} spendable right now, ${firstName}. Pick an amount up to that and I'll move it into your Earn vault.` }); } else { const h = await run("startEarning", [units], { description: `Move ${amt(it.amount)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. ${amt(it.amount)} is in your Cowrie Earn vault now, growing at 10% a year. Pull it out anytime with the Withdraw button on the home screen.` }); } }
+      else if (it.action === "earn") { const units = toUnits(it.amount || 0, c); if (!it.amount || units <= 0n) { say({ who: "cowrie", text: `How much would you like to move into earning, ${firstName}?`, options: ["Earn ₦10,000", "Earn ₦50,000", "Earn ₦100,000", "Another amount"] }); } else if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} spendable right now, ${firstName}. Pick an amount up to that and I'll move it into your Earn vault.` }); } else { const h = await run("startEarning", [units], { description: `Move ${amt(it.amount)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. ${amt(it.amount)} is in your Cowrie Earn vault now, growing at 10% a year. Pull it out anytime under Activity, or just tell me.` }); } }
+      else if (it.action === "stopEarn") { if (earned <= 0n) { say({ who: "cowrie", text: `There's nothing in your Earn vault right now, ${firstName}.` }); } else if (it.amount && Number(it.amount) > 0) { await withdrawEarn((Number(it.amount) / (CURRENCIES[c] || CURRENCIES.NGN).perUsd) * (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd); } else { await withdrawEarnings(); } }
       else if (it.action === "swap") { const found = resolveAsset((it.asset || "").toString()); if (!found) { say({ who: "cowrie", tone: "bad", text: `I don't have a pool for "${it.asset || "that"}" yet, ${firstName}. Right now you can trade ${assets.map((a) => a.symbol).join(", ") || "nothing yet"}.` }); } else if (it.direction === "sell") { await sellAsset(found.addr, it.amount || 0); } else if (!it.amount) { say({ who: "cowrie", text: `How much do you want to put into ${found.symbol}, ${firstName}?`, options: [`Buy ₦10,000 of ${found.symbol}`, `Buy ₦50,000 of ${found.symbol}`, `Buy ₦100,000 of ${found.symbol}`, "Another amount"] }); } else { await buyAsset(found.addr, it.amount); } }
       else if (it.action === "balance") { say({ who: "cowrie", text: `${firstName}, you've got ${cfmt(spendable)} to spend${savings > 0n ? `, with ${cfmt(savings)} tucked away in savings` : ""}. ${false ? "Your wallet needs a little MON for gas before you can move it." : `You've ${Number(formatEther(gas)).toFixed(3)} MON left for gas.`}` }); }
       else if (it.action === "addSubscription") {
@@ -753,14 +797,8 @@ export default function CowrieApp() {
         }
       }
       else if (it.action === "payBill") {
-        const what = (it.what || "that").toString();
-        const isAir = /airtime|data|recharge/i.test(what) || /\b(airtime|data|recharge)\b/i.test(text);
-        const hasNet = /\b(mtn|glo|airtel|9 ?mobile|etisalat)\b/i.test(what);
-        const hasNum = /\d{10,}/.test(what);
-        if (isAir && !hasNet) { say({ who: "cowrie", text: `Which network, ${firstName}?`, options: ["MTN", "Glo", "Airtel", "9mobile"] }); }
-        else if (isAir && !hasNum) { say({ who: "cowrie", text: `What number is getting the airtime, ${firstName}? Send the 11-digit phone number.` }); }
-        else if (!it.amount) { say({ who: "cowrie", text: `How much for ${what}, ${firstName}?` }); }
-        else { const units = toUnits(it.amount, c); if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} to spend right now, ${firstName}. Add money or try a smaller amount.` }); } else { const h = await run("send", [MERCHANT, units], { description: `Pay ${amt(it.amount)} for ${what}.`, successHeader: "Paid", title: what }); logTx({ hash: h, title: `Paid ${what}`, amount: amt(it.amount), sign: "neg" }); say({ who: "cowrie", tone: "good", text: `Sent ${amt(it.amount)} for ${what}, ${firstName}. Sorted.` }); } }
+        const bk = detectBill(String(it.what || "") + " " + text);
+        startBill(bk && bk !== "ask" ? bk : "ask");
       }
       else if (it.action === "request") { const who = (it.from || "someone").toString(); addRequest(who, it.amount || 0, c, (it.note || "").toString()); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. I've set up a request for ${amt(it.amount || 0)}${it.note ? ` for ${it.note}` : ""}${it.from ? ` from ${it.from}` : ""}. It's under People, tap Copy to share it.` }); }
       else if (it.action === "split") { const names = Array.isArray(it.names) ? it.names.filter(Boolean).map((x: unknown) => String(x)) : []; const n = names.length || it.people || 2; const share = Math.round((it.amount || 0) / n); if (names.length) names.forEach((nm: string) => addRequest(nm, share, c, "split bill")); say({ who: "cowrie", tone: "good", text: `${amt(it.amount || 0)} split ${n} way${n === 1 ? "" : "s"} is ${amt(share)} each.${names.length ? ` I've made a request for ${names.join(", ")}, under People.` : " Tell me the names and I'll make each request."}` }); }
@@ -805,7 +843,7 @@ export default function CowrieApp() {
           const next = [...guards, g]; setGuards(next); if (addr) persist("cowrie.guards." + addr, JSON.stringify(next));
           const doing = g.act === "protect" ? "move your savings into the vault" : g.act === "sell" ? `sell${g.amount ? " " + amtStr(g.amount) : ""}` : g.act === "buy" ? `buy${g.amount ? " " + amtStr(g.amount) : ""}` : "flag it to you";
           const now = clPrices[key]?.price;
-          say({ who: "cowrie", tone: "good", text: `Set, ${firstName}. Guardian is watching ${key} on Chainlink${now ? ` (now about $${Math.round(now).toLocaleString()})` : ""} and will ${doing} the moment it goes ${g.op} $${g.price.toLocaleString()}. Find it under Activity, Guardian.` });
+          say({ who: "cowrie", tone: "good", text: `Set, ${firstName}. Guardian is watching ${key} on Chainlink${now ? ` (now about $${Math.round(now).toLocaleString()})` : ""} and will ${doing} the moment it goes ${g.op} $${g.price.toLocaleString()}. It's on the Guardian card on Home.` });
         }
       }
       else if (it.action === "ajoDo") {
