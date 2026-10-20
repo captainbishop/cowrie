@@ -1,51 +1,15 @@
 "use client";
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useCallback, useEffect, useRef, useState } from "react";
-import { parseAbi } from "viem";
-import { ajoAbi, AJO_ADDRESS, AJO_STATUS } from "../lib/ajo";
-import { addresses } from "../lib/contracts";
-
-const tokenAbi = parseAbi([
-  "function balanceOf(address) view returns (uint256)",
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-  "function mint(address to, uint256 amount)",
-]);
-
-const MAX = 2n ** 256n - 1n;
-const UNIT_SECONDS: Record<string, number> = { minutes: 60, hours: 3600, days: 86400, weeks: 604800, months: 2592000 };
-const vaultDepositAbi = parseAbi(["function deposit(uint256 amount)"]);
-// Remembers the last answer so the sheet shows your circles immediately when you reopen it.
-const CACHE = new Map<string, { views: View[]; bal: bigint }>();
+import { useEffect, useRef, useState } from "react";
+import { ajoAbi, AJO_ADDRESS } from "../lib/ajo";
+import { useAjo, refreshAjoNow, fmtDur, fmtLen, type Circle } from "../lib/ajoStore";
+import { fundWallet, moveToSpendable, backupDraw, ajoTarget } from "../lib/ajoActions";
 
 type RunUi = { description?: string; successHeader?: string; title?: string; buttonText?: string };
 type RunFn = (fn: string, args: unknown[], ui?: RunUi, target?: { address: `0x${string}`; abi: any }) => Promise<string>;
 
-type View = {
-  id: number;
-  name: string;
-  contribution: bigint;
-  deposit: bigint;
-  maxMembers: number;
-  round: number;
-  status: number;
-  members: string[];
-  order: string[];
-  mine: boolean;
-  paidNow: boolean;
-  myDeposit: bigint;
-  myStrikes: number;
-  endsAt: number;
-  inviteOnly: boolean;
-};
-
-// amounts are shown in the user's own currency via the fmt prop
-
-function dur(s: number): string {
-  if (s >= 86400) return `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h`;
-  if (s >= 3600) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+const UNIT_SECONDS: Record<string, number> = { minutes: 60, hours: 3600, days: 86400, weeks: 604800, months: 2592000 };
+const STATUS_TEXT = ["Open", "Full", "Live", "Completed", "Cancelled", "Ended"];
 
 const inputStyle = {
   width: "100%",
@@ -58,22 +22,10 @@ const inputStyle = {
   font: "inherit",
 } as const;
 
+type Detail = { key: string; missed: { round: number; member: string }[] };
+
 export default function OnchainAjo({
-  addr,
-  publicClient,
-  run,
-  busy,
-  setBusy,
-  flash,
-  errText,
-  fmt,
-  toU,
-  symbol,
-  perUsd,
-  spendable,
-  book,
-  prefill,
-  focusId,
+  addr, publicClient, run, busy, setBusy, flash, errText, fmt, toU, symbol, perUsd, spendable, book, prefill, focusId, refresh,
 }: {
   addr?: `0x${string}`;
   publicClient: any;
@@ -90,130 +42,91 @@ export default function OnchainAjo({
   book: { name: string; address: string }[];
   prefill: { name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null;
   focusId: number | null;
+  refresh?: () => Promise<unknown> | void;
 }) {
-  const cusd = (v: bigint) => fmt(v);
-  const [views, setViews] = useState<View[]>(() => CACHE.get((addr || "").toLowerCase())?.views ?? []);
-  const [loaded, setLoaded] = useState(() => CACHE.has((addr || "").toLowerCase()));
-  const [bal, setBal] = useState<bigint>(() => CACHE.get((addr || "").toLowerCase())?.bal ?? 0n);
+  const { circles, bal, fallbackEnabled, fallbackDelay, loaded, error } = useAjo(publicClient, addr, { fast: true });
+  const me = (addr || "").toLowerCase();
+  const ctx = { addr: addr as `0x${string}`, publicClient, run, spendable, fmt };
+
   const [, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => setTick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  // The moment a countdown ends, read again so the screen moves on without waiting for the next check.
+  useEffect(() => {
+    if (circles.some((c) => c.status === 2 && c.roundEndsAt > 0 && nowSec === c.roundEndsAt + 1)) void refreshAjoNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nowSec]);
+
   const [showForm, setShowForm] = useState(false);
   const [fName, setFName] = useState("Family Ajo");
   const [fAmt, setFAmt] = useState(String(Math.round(10 * perUsd)));
   const [fMult, setFMult] = useState("2");
-  const [fLen, setFLen] = useState("5");
-  const [fUnit, setFUnit] = useState("minutes");
+  const [fLen, setFLen] = useState("1");
+  const [fUnit, setFUnit] = useState("weeks");
   const [fSize, setFSize] = useState("3");
   const [fInvite, setFInvite] = useState(true);
-  const [secTab, setSecTab] = useState<"auto" | "live" | "open" | "join" | "done">("auto");
   const [picked, setPicked] = useState<string[]>([]);
+  const [secTab, setSecTab] = useState<"auto" | "live" | "open" | "join" | "done">("auto");
+  const [ask, setAsk] = useState("");
+  const [details, setDetails] = useState<Record<number, Detail>>({});
+  const loadingDetail = useRef<Set<number>>(new Set());
 
-  const me = (addr || "").toLowerCase();
-
-  // The chat can pre-fill this form ("start an ajo called X with Ike, 50k").
+  // The chat can pre-fill this form ("start an ajo called X with Ike, 50k, weekly").
   useEffect(() => {
     if (!prefill) return;
     if (prefill.name) setFName(prefill.name);
+    if (prefill.amount && prefill.amount > 0) setFAmt(String(Math.round(prefill.amount)));
     if (prefill.minutes && prefill.minutes > 0) {
       const m = prefill.minutes;
       const pair: [number, string] = m % 43200 === 0 ? [m / 43200, "months"] : m % 10080 === 0 ? [m / 10080, "weeks"] : m % 1440 === 0 ? [m / 1440, "days"] : m % 60 === 0 ? [m / 60, "hours"] : [m, "minutes"];
       setFLen(String(pair[0]));
       setFUnit(pair[1]);
     }
-    if (prefill.amount && prefill.amount > 0) setFAmt(String(Math.round(prefill.amount)));
     const wanted = (prefill.invitees || []).map((n) => n.toLowerCase());
-    const found = book
-      .filter((b) => wanted.some((n) => b.name.toLowerCase() === n || b.name.toLowerCase().startsWith(n)))
-      .map((b) => b.address.toLowerCase());
-    if (found.length) {
-      setPicked(found);
-      setFInvite(true);
-      setFSize(String(Math.min(20, found.length + 1)));
-    }
+    const found = book.filter((b) => wanted.some((n) => b.name.toLowerCase() === n || b.name.toLowerCase().startsWith(n))).map((b) => b.address.toLowerCase());
+    if (found.length) { setPicked(found); setFInvite(true); setFSize(String(Math.min(20, found.length + 1))); }
     setShowForm(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
-  const target = { address: AJO_ADDRESS, abi: ajoAbi };
-  const read = useCallback(
-    (functionName: string, args: unknown[]) =>
-      publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName, args }),
-    [publicClient],
-  );
 
-  const load = useCallback(async () => {
-    if (!addr || !AJO_ADDRESS) return;
-    if (typeof document !== "undefined" && document.hidden) return;
-    try {
-      const [b, countRaw] = await Promise.all([
-        publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] }),
-        read("circleCount", []),
-      ]);
-      setBal(b as bigint);
-      const count = Number(countRaw);
-      const nowSec = Math.floor(Date.now() / 1000);
-      const ids: number[] = [];
-      for (let i = count; i >= 1 && ids.length < 8; i--) ids.push(i);
-      if (focusId && focusId <= count && !ids.includes(focusId)) ids.push(focusId);
-      const rows = await Promise.all(
-        ids.map(async (i): Promise<View | null> => {
-          const id = BigInt(i);
-          const c: any = await read("getCircle", [id]);
-          const members: string[] = [...c.members];
-          const mine = members.some((m) => m.toLowerCase() === me);
-          const status = Number(c.status);
-          const joinable = status === 0 && Number(c.joinDeadline) > nowSec;
-          if (!mine && !joinable) return null;
-          if (!mine && c.inviteOnly) {
-            const invited = (await read("isInvited", [id, addr])) as boolean;
-            if (!invited) return null;
-          }
-          let paidNow = false;
-          let myDeposit = 0n;
-          let myStrikes = 0;
-          let endsAt = 0;
-          if (mine) {
-            const [dep, str] = await Promise.all([read("depositOf", [id, addr]), read("strikes", [id, addr])]);
-            myDeposit = dep as bigint;
-            myStrikes = Number(str);
-            if (status === 2) {
-              const [p, e] = await Promise.all([read("paid", [id, Number(c.round), addr]), read("roundEnd", [id])]);
-              paidNow = p as boolean;
-              endsAt = Number(e);
-            }
-          }
-          return {
-            id: i, name: c.name, contribution: c.contribution, deposit: c.deposit,
-            maxMembers: Number(c.maxMembers), round: Number(c.round), status, members,
-            order: [...c.order], mine, paidNow, myDeposit, myStrikes, endsAt, inviteOnly: !!c.inviteOnly,
-          };
-        }),
-      );
-      const out = rows.filter((x): x is View => x !== null).slice(0, 6);
-      setViews(out);
-      CACHE.set(me, { views: out, bal: b as bigint });
-    } catch {
-    } finally {
-      setLoaded(true);
+  const who = (a: string) => (a.toLowerCase() === me ? "you" : book.find((b) => b.address.toLowerCase() === a.toLowerCase())?.name || `${a.slice(0, 6)}...${a.slice(-4)}`);
+  const keyOf = (c: Circle) => `${c.status}-${c.round}-${c.myStrikes}`;
+
+  async function loadDetails(c: Circle) {
+    const settled = c.status === 3 ? c.members.length : c.status === 2 || c.status === 5 ? c.round - 1 : 0;
+    const key = keyOf(c);
+    if (settled <= 0) { setDetails((d) => ({ ...d, [c.id]: { key, missed: [] } })); return; }
+    const subset = c.members.length * settled <= 80 ? c.members : c.members.filter((m) => m.toLowerCase() === me);
+    const reads: Promise<{ round: number; member: string; paid: boolean }>[] = [];
+    for (let r = 1; r <= settled; r++) {
+      for (const m of subset) {
+        reads.push(Promise.resolve(publicClient.readContract({ address: AJO_ADDRESS, abi: ajoAbi, functionName: "paid", args: [BigInt(c.id), r, m] })).then((p: any) => ({ round: r, member: m, paid: !!p })));
+      }
     }
-  }, [addr, publicClient, read, me, focusId]);
-
+    const res = await Promise.all(reads);
+    setDetails((d) => ({ ...d, [c.id]: { key, missed: res.filter((x) => !x.paid).map((x) => ({ round: x.round, member: x.member })) } }));
+  }
   useEffect(() => {
-    load();
-    const t = setInterval(load, 45000);
-    return () => clearInterval(t);
-  }, [load]);
+    circles.forEach((c) => {
+      const d = details[c.id];
+      if (c.isMember && c.myStrikes > 0 && c.status >= 2 && (!d || d.key !== keyOf(c)) && !loadingDetail.current.has(c.id)) {
+        loadingDetail.current.add(c.id);
+        loadDetails(c).catch(() => {}).finally(() => loadingDetail.current.delete(c.id));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [circles]);
 
-  useEffect(() => {
-    const t = setInterval(() => setTick((x) => x + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  async function act(label: string, fn: () => Promise<boolean | void>) {
+  async function act(okMsg: string, fn: () => Promise<boolean | void>) {
     if (busy) return;
     setBusy(true);
     try {
       const ok = await fn();
-      await load();
-      if (ok !== false) flash(label);
+      await refreshAjoNow();
+      try { await refresh?.(); } catch {}
+      setAsk("");
+      if (ok !== false) flash(okMsg);
     } catch (e) {
       flash(errText(e));
     } finally {
@@ -222,104 +135,236 @@ export default function OnchainAjo({
   }
 
   const need = (amount: bigint) => {
-    if (bal + spendable < amount) {
-      flash(`Not enough spendable balance: you need ${cusd(amount)}.`);
-      return false;
-    }
+    if (bal + spendable < amount) { flash(`Not enough balance: you need ${fmt(amount)}`); return false; }
     return true;
   };
+  const t = ajoTarget();
 
-  // Make sure the wallet holds `amount`, moving any shortfall out of spendable, then allow the Ajo contract.
-  async function fund(amount: bigint) {
-    const have = (await publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] })) as bigint;
-    if (have < amount) {
-      await run("withdraw", [amount - have], { title: "Move money for your Ajo", description: `${cusd(amount - have)} from spendable to your wallet.`, successHeader: "Moved", buttonText: "Move" });
-    }
-    await approveIfNeeded(amount);
-  }
-
-  async function approveIfNeeded(amount: bigint) {
-    const have = (await publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "allowance", args: [addr, AJO_ADDRESS] })) as bigint;
-    if (have >= amount) return;
+  const create = () => act("Circle created", async () => {
+    const contribution = toU(Number(fAmt) || 0);
+    const mult = BigInt(Math.max(1, Math.floor(Number(fMult) || 1)));
+    const deposit = contribution * mult;
+    const size = Math.floor(Number(fSize));
+    const period = Math.round((Number(fLen) || 0) * (UNIT_SECONDS[fUnit] || 60));
+    if (!fName.trim()) throw new Error("Give the circle a name");
+    if (contribution <= 0n) throw new Error("Enter an amount per round");
+    if (!(size >= 2 && size <= 20)) throw new Error("A circle needs 2 to 20 members");
+    if (!(period >= 60)) throw new Error("Rounds must be at least 1 minute");
+    if (fInvite && picked.length === 0) throw new Error("Pick at least one friend to invite, or switch to Anyone can join");
+    if (!need(deposit)) return false;
+    await fundWallet(ctx, deposit);
+    const joinDeadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 86400);
     await run(
-      "approve",
-      [AJO_ADDRESS, MAX],
-      { title: "Allow Cowrie Ajo", description: "Lets the Ajo contract take your deposit and your round payments.", successHeader: "Allowed", buttonText: "Allow" },
-      { address: addresses.usd, abi: tokenAbi },
+      fInvite ? "createInviteOnlyCircle" : "createCircle",
+      fInvite
+        ? [{ name: fName.trim(), contribution, deposit, period: BigInt(period), joinDeadline, maxMembers: size }, picked]
+        : [fName.trim(), contribution, deposit, BigInt(period), joinDeadline, size],
+      { title: `Create "${fName.trim()}"`, description: `Locks a ${fmt(deposit)} deposit.`, successHeader: "Circle created", buttonText: "Create" },
+      t,
     );
-  }
+    setShowForm(false);
+    setSecTab("auto");
+  });
 
-  const moveToSpendable = () =>
-    act("Moved to spendable", async () => {
-      const have = (await publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [addr] })) as bigint;
-      if (have <= 0n) { flash("Nothing in your wallet to move."); return false; }
-      const allowed = (await publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "allowance", args: [addr, addresses.vault] })) as bigint;
-      if (allowed < have) {
-        await run("approve", [addresses.vault, MAX], { title: "Allow Cowrie", description: "Lets Cowrie move your Ajo money back into spendable.", successHeader: "Allowed", buttonText: "Allow" }, { address: addresses.usd, abi: tokenAbi });
-      }
-      await run("deposit", [have], { title: "Move to spendable", description: `${cusd(have)} back to your spendable balance.`, successHeader: "Moved", buttonText: "Move" }, { address: addresses.vault, abi: vaultDepositAbi });
-    });
+  const join = (c: Circle) => act("Joined the circle", async () => {
+    if (!need(c.deposit)) return false;
+    await fundWallet(ctx, c.deposit);
+    await run("join", [BigInt(c.id)], { title: `Join "${c.name}"`, description: `Locks a ${fmt(c.deposit)} deposit.`, successHeader: "Joined", buttonText: "Join" }, t);
+  });
+  const leave = (c: Circle) => act("You left the circle", async () => {
+    await run("leave", [BigInt(c.id)], { title: `Leave "${c.name}"`, description: `Your ${fmt(c.deposit)} deposit comes back to your wallet.`, successHeader: "Left", buttonText: "Leave" }, t);
+  });
+  const cancel = (c: Circle) => act("Circle cancelled", async () => {
+    await run("cancel", [BigInt(c.id)], { title: `Cancel "${c.name}"`, description: "Everyone can take their deposit back.", successHeader: "Cancelled", buttonText: "Cancel circle" }, t);
+  });
+  const pay = (c: Circle) => act("Paid for this round", async () => {
+    if (!need(c.contribution)) return false;
+    await fundWallet(ctx, c.contribution);
+    await run("contribute", [BigInt(c.id)], { title: `Pay "${c.name}"`, description: `${fmt(c.contribution)} for round ${c.round}.`, successHeader: "Paid", buttonText: "Pay" }, t);
+  });
+  const settle = (c: Circle) => act("Round settled", async () => {
+    await run("settleRound", [BigInt(c.id)], { title: `Settle "${c.name}"`, description: "Pays this round's pot to its collector.", successHeader: "Settled", buttonText: "Settle" }, t);
+  });
+  const withdraw = (c: Circle) => act("Deposit withdrawn", async () => {
+    await run("withdrawDeposit", [BigInt(c.id)], { title: "Withdraw deposit", description: `${fmt(c.myDeposit)} back to your wallet.`, successHeader: "Withdrawn", buttonText: "Withdraw" }, t);
+  });
+  const voteEnd = (c: Circle) => act("Your vote is in", async () => {
+    await run("voteEnd", [BigInt(c.id)], { title: `End "${c.name}" early`, description: "The circle ends only if every member agrees.", successHeader: "Voted", buttonText: "Vote to end" }, t);
+  });
+  const retract = (c: Circle) => act("Vote taken back", async () => {
+    await run("retractEndVote", [BigInt(c.id)], { title: "Take back my vote", description: "The circle keeps going.", successHeader: "Done", buttonText: "Take back" }, t);
+  });
+  const toggleAutopay = (c: Circle) => act(c.autopayOn ? "Auto-pay is off" : "Auto-pay is on", async () => {
+    if (!c.autopayOn) {
+      const left = c.status === 2 ? c.members.length - c.round + 1 : c.maxMembers;
+      const reserve = c.contribution * BigInt(Math.max(1, left));
+      if (!need(reserve)) return false;
+      await fundWallet(ctx, reserve);
+    }
+    await run("setAutopay", [BigInt(c.id), !c.autopayOn], { title: c.autopayOn ? "Turn off auto-pay" : "Turn on auto-pay", description: c.autopayOn ? "You will pay by hand again." : "Your share is taken from your wallet at the start of each round.", successHeader: "Done", buttonText: "Confirm" }, t);
+  });
+  const backup = (c: Circle) => act("Order drawn by the backup", async () => { await backupDraw(ctx, c.id); });
+  const moveMoney = () => act("Moved to spendable", async () => {
+    const moved = await moveToSpendable(ctx);
+    if (moved <= 0n) { flash("Nothing in your wallet to move"); return false; }
+  });
 
-  const create = () =>
-    act("Circle created", async () => {
-      const contribution = toU(Number(fAmt) || 0);
-      const mult = BigInt(Math.max(1, Math.floor(Number(fMult) || 1)));
-      const deposit = contribution * mult;
-      const size = Math.floor(Number(fSize));
-      const period = Math.round((Number(fLen) || 0) * (UNIT_SECONDS[fUnit] || 60));
-      if (!fName.trim()) throw new Error("Give the circle a name.");
-      if (contribution <= 0n) throw new Error("Enter an amount per round.");
-      if (!(size >= 2 && size <= 20)) throw new Error("A circle needs 2 to 20 members.");
-      if (!(period >= 60)) throw new Error("Rounds must be at least 1 minute.");
-      if (fInvite && picked.length === 0) throw new Error("Pick at least one friend to invite, or switch to Anyone can join.");
-      if (!need(deposit)) return false;
-      await fund(deposit);
-      const joinDeadline = BigInt(Math.floor(Date.now() / 1000) + 7 * 86400);
-      await run(
-        fInvite ? "createInviteOnlyCircle" : "createCircle",
-        fInvite
-          ? [{ name: fName.trim(), contribution, deposit, period: BigInt(period), joinDeadline, maxMembers: size }, picked]
-          : [fName.trim(), contribution, deposit, BigInt(period), joinDeadline, size],
-        { title: `Create "${fName.trim()}"`, description: `Locks a ${cusd(deposit)} deposit.`, successHeader: "Circle created", buttonText: "Create" },
-        target,
-      );
-      setShowForm(false);
-    });
-
-  const join = (v: View) =>
-    act("Joined the circle", async () => {
-      if (!need(v.deposit)) return false;
-      await fund(v.deposit);
-      await run("join", [BigInt(v.id)], { title: `Join "${v.name}"`, description: `Locks a ${cusd(v.deposit)} deposit.`, successHeader: "Joined", buttonText: "Join" }, target);
-    });
-
-  const pay = (v: View) =>
-    act("Paid for this round", async () => {
-      if (!need(v.contribution)) return false;
-      await fund(v.contribution);
-      await run("contribute", [BigInt(v.id)], { title: `Pay "${v.name}"`, description: `${cusd(v.contribution)} for round ${v.round}.`, successHeader: "Paid", buttonText: "Pay" }, target);
-    });
-
-  const withdraw = (v: View) =>
-    act("Deposit withdrawn", async () => {
-      await run("withdrawDeposit", [BigInt(v.id)], { title: "Withdraw deposit", description: `${cusd(v.myDeposit)} back to your wallet.`, successHeader: "Withdrawn", buttonText: "Withdraw" }, target);
-    });
-
-  const who = (a: string) => (a.toLowerCase() === me ? "You" : `${a.slice(0, 6)}…${a.slice(-4)}`);
-
-  const grpOf = (v: View): "live" | "open" | "join" | "done" => (v.status >= 3 ? "done" : v.status === 2 ? "live" : v.mine ? "open" : "join");
-  const counts = { live: 0, open: 0, join: 0, done: 0 };
-  views.forEach((v) => { counts[grpOf(v)] += 1; });
-  const effTab: "live" | "open" | "join" | "done" = secTab !== "auto" ? secTab : counts.live ? "live" : counts.open ? "open" : counts.join ? "join" : counts.done ? "done" : "live";
-  const shown = views.filter((v) => grpOf(v) === effTab);
-
-  const share = async (v: View) => {
-    const url = `${window.location.origin}/?ajo=${v.id}`;
-    const text = `Join "${v.name}" on Cowrie: ${cusd(v.contribution)} each round.`;
-    try {
-      if (navigator.share) { await navigator.share({ title: "Cowrie Ajo", text, url }); return; }
-    } catch { return; }
+  const share = async (c: Circle) => {
+    const url = `${window.location.origin}/?ajo=${c.id}`;
+    const text = `Join "${c.name}" on Cowrie: ${fmt(c.contribution)} each round.`;
+    try { if (navigator.share) { await navigator.share({ title: "Cowrie Ajo", text, url }); return; } } catch { return; }
     try { await navigator.clipboard.writeText(url); flash("Link copied"); } catch { flash(url); }
+  };
+
+  const btn = (label: string, fn: () => void, primary = false) => (
+    <button className={"mini " + (primary ? "pay" : "ghost")} onClick={fn} disabled={busy}>{label}</button>
+  );
+
+  const visible = circles.filter((c) => c.isMember || (c.status === 0 && c.joinDeadline > nowSec && (!c.inviteOnly || c.isInvited)));
+  const grpOf = (c: Circle): "live" | "open" | "join" | "done" => (c.status >= 3 ? "done" : c.status === 2 ? "live" : c.isMember ? "open" : "join");
+  const counts = { live: 0, open: 0, join: 0, done: 0 };
+  visible.forEach((c) => { counts[grpOf(c)] += 1; });
+  const effTab = secTab !== "auto" ? secTab : counts.live ? "live" : counts.open ? "open" : counts.join ? "join" : counts.done ? "done" : "live";
+  const shown = visible.filter((c) => grpOf(c) === effTab);
+
+  const stepLine = (c: Circle) => {
+    if (c.status >= 4) return null;
+    const n = c.maxMembers;
+    const rl = n <= 4 ? "Round " : "R";
+    const labels = ["Join", "Draw", ...Array.from({ length: n }, (_, i) => `${rl}${i + 1}`), "Done"];
+    const cur = c.status === 0 ? 0 : c.status === 1 ? 1 : c.status === 2 ? 1 + c.round : labels.length - 1;
+    return (
+      <div className="ajorder" style={{ marginBottom: 8 }}>
+        {labels.map((l, i) => (<span key={i} className={"ajochip" + (i === cur ? " on" : "")}>{i < cur ? "✓ " : ""}{l}</span>))}
+      </div>
+    );
+  };
+
+  const card = (c: Circle) => {
+    const n = c.members.length;
+    const collector = c.order[c.round - 1] || "";
+    const iAmCollector = collector.toLowerCase() === me;
+    const isCreator = c.creator.toLowerCase() === me;
+    const left = c.roundEndsAt - nowSec;
+    const waiting = Math.max(0, nowSec - c.fullAt);
+    const fbIn = c.fullAt + fallbackDelay - nowSec;
+    const det = details[c.id];
+    return (
+      <div className="pcard" key={c.id} style={{ marginBottom: 10 }}>
+        <div className="prow" style={{ cursor: "default" }}>
+          <span className="prl">
+            <b>{c.name}</b>
+            <small>#{c.id} · {fmt(c.contribution)} each · {n}/{c.maxMembers} members · every {fmtLen(c.period)}{c.inviteOnly ? " · invite-only" : ""}</small>
+          </span>
+          <span className="prr"><b>{STATUS_TEXT[c.status]}</b></span>
+        </div>
+        <div className="posexp">
+          {stepLine(c)}
+
+          {c.status === 0 && !c.isMember && (
+            <>
+              <div className="ds" style={{ marginBottom: 6 }}>Join with a {fmt(c.deposit)} deposit. It comes back at the end, minus any payment you miss. Each round you pay {fmt(c.contribution)}, and a round lasts {fmtLen(c.period)}.</div>
+              <div className="posacts">{btn(`Join and lock ${fmt(c.deposit)}`, () => join(c), true)}</div>
+            </>
+          )}
+
+          {c.status === 0 && c.isMember && (
+            <>
+              <div className="ds" style={{ marginBottom: 6 }}>{n} of {c.maxMembers} have joined. Waiting for {c.maxMembers - n} more. When the circle is full, Chainlink CRE draws the payout order.</div>
+              <div className="posacts">
+                {isCreator && btn("Share link", () => share(c), true)}
+                {isCreator && (ask === `cancel-${c.id}` ? btn("Yes, cancel and refund everyone", () => cancel(c), true) : btn("Cancel circle", () => setAsk(`cancel-${c.id}`)))}
+                {!isCreator && (ask === `leave-${c.id}` ? btn("Yes, leave and take my deposit back", () => leave(c), true) : btn("Leave circle", () => setAsk(`leave-${c.id}`)))}
+              </div>
+            </>
+          )}
+
+          {c.status === 1 && (
+            <>
+              <div className="ds" style={{ marginBottom: 6 }}>Everyone is in. Chainlink CRE is drawing the payout order from the live Bitcoin price. Waiting {fmtDur(waiting)} so far, it usually takes under a minute.</div>
+              {fallbackEnabled && (fbIn > 0
+                ? <div className="ds" style={{ marginBottom: 6 }}>If CRE has not drawn within {fmtDur(fbIn)}, a backup draw on the contract becomes available.</div>
+                : <div className="ds" style={{ marginBottom: 6 }}>CRE has had its turn. Anyone in the circle can now run the backup draw.</div>)}
+              <div className="posacts">
+                {fallbackEnabled && fbIn <= 0 && btn("Run backup draw", () => backup(c), true)}
+                {isCreator && (ask === `cancel-${c.id}` ? btn("Yes, cancel and refund everyone", () => cancel(c), true) : btn("Cancel circle", () => setAsk(`cancel-${c.id}`)))}
+              </div>
+            </>
+          )}
+
+          {c.status === 2 && (
+            <>
+              <div className="ds" style={{ marginBottom: 4 }}>Round {c.round} of {n}. {iAmCollector ? "You collect" : `${who(collector)} collects`} {fmt(c.contribution * BigInt(n))} this round.</div>
+              <div className="ds" style={{ marginBottom: 6 }}>
+                {left > 0 ? `Ends in ${fmtDur(left)}.` : `Time is up. Chainlink CRE is settling this round and paying the pot to ${iAmCollector ? "you" : who(collector)}.`}
+              </div>
+              <div className="ds" style={{ marginBottom: 6 }}>Payout order, {c.drawnBy === 1 ? "drawn by Chainlink CRE" : "drawn by the on-chain backup"}:</div>
+              <div className="ajorder" style={{ marginBottom: 8 }}>
+                {c.order.map((a, i) => (<span key={i} className={"ajochip" + (i === c.round - 1 ? " on" : "")}>{i + 1}. {who(a)}</span>))}
+              </div>
+              <div className="posacts">
+                {c.isMember && !c.paidNow && left > 0 && btn(`Pay ${fmt(c.contribution)} for round ${c.round}`, () => pay(c), true)}
+                {c.isMember && c.paidNow && <span className="muted2">You have paid for this round ✓</span>}
+                {c.isMember && left <= 0 && btn(iAmCollector ? "Collect my pot now" : "Settle round now", () => settle(c), true)}
+              </div>
+            </>
+          )}
+
+          {c.status >= 3 && (
+            <>
+              <div className="ds" style={{ marginBottom: 6 }}>
+                {c.status === 3 ? "Circle complete. Every round was paid out." : c.status === 4 ? "Circle cancelled. Nothing was paid out, and deposits are refunded." : "Circle ended early by agreement. Deposits are refunded."}
+              </div>
+              {c.drawnBy > 0 && c.order.length > 0 && (
+                <div className="ajorder" style={{ marginBottom: 8 }}>
+                  {c.order.map((a, i) => (<span key={i} className="ajochip">{i + 1}. {who(a)}</span>))}
+                </div>
+              )}
+              {c.isMember && c.myDeposit > 0n && <div className="posacts">{btn(`Withdraw ${fmt(c.myDeposit)} deposit`, () => withdraw(c), true)}</div>}
+            </>
+          )}
+
+          {c.isMember && c.status >= 2 && c.myStrikes > 0 && (
+            <div className="ds" style={{ marginTop: 8 }}>
+              <b>Missed payments</b>
+              {det && det.missed.length > 0
+                ? det.missed.map((x, i) => (<div key={i}>Round {x.round}: {who(x.member)} missed the payment. Up to {fmt(c.contribution)} was taken from {x.member.toLowerCase() === me ? "your" : "their"} deposit.</div>))
+                : <div>You missed {c.myStrikes} payment{c.myStrikes === 1 ? "" : "s"}. Up to {fmt(c.contribution)} each was taken from your deposit. Checking which round...</div>}
+            </div>
+          )}
+
+          {c.isMember && c.status <= 2 && (
+            <div style={{ marginTop: 10 }}>
+              <div className="ds" style={{ marginBottom: 6 }}>
+                {c.autopayOn ? "Auto-pay is on: your share is taken from your wallet at the start of each round." : "Auto-pay is off. Turn it on to have your share taken from your wallet at the start of each round."}
+              </div>
+              <div className="posacts">{btn(c.autopayOn ? "Turn off auto-pay" : "Turn on auto-pay", () => toggleAutopay(c))}</div>
+            </div>
+          )}
+
+          {c.isMember && c.status === 2 && (
+            <div style={{ marginTop: 10 }}>
+              {c.endVotedByMe ? (
+                <>
+                  <div className="ds" style={{ marginBottom: 6 }}>You voted to end early. {c.endVotes} of {n} members have voted.</div>
+                  <div className="posacts">{btn("Take back my vote", () => retract(c))}</div>
+                </>
+              ) : ask === `end-${c.id}` ? (
+                <>
+                  <div className="ds" style={{ marginBottom: 6 }}>The circle ends only if every member agrees. Members who have not collected yet lose their turn, this round's payments are refunded, and everyone gets their deposit back.</div>
+                  <div className="posacts">
+                    {btn("Yes, I agree to end", () => voteEnd(c), true)}
+                    {btn("No, keep going", () => setAsk(""))}
+                  </div>
+                </>
+              ) : (
+                <div className="posacts">{btn("Propose ending early", () => setAsk(`end-${c.id}`))}</div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   if (!AJO_ADDRESS) return <p className="muted">On-chain Ajo is not set up yet. Add NEXT_PUBLIC_AJO_CIRCLE to web/.env.local.</p>;
@@ -328,11 +373,19 @@ export default function OnchainAjo({
   return (
     <div style={{ marginBottom: 18 }}>
       <div className="poshead">
-        On-chain Ajo <span style={{ color: "var(--brass)", fontWeight: 700 }}>· drawn and paid out by Chainlink CRE</span>
+        On-chain Ajo <span style={{ color: "var(--brass)", fontWeight: 700 }}>· Chainlink CRE draws and pays out, with an on-chain backup</span>
       </div>
-      <div className="ds" style={{ marginBottom: 8 }}>Spendable: {cusd(spendable)}{bal > 0n ? ` · ${cusd(bal)} waiting in your wallet` : ""}</div>
+      <details style={{ marginBottom: 10 }}>
+        <summary className="ds" style={{ cursor: "pointer", fontWeight: 600 }}>What is an Ajo?</summary>
+        <div className="ds" style={{ marginTop: 6 }}>
+          An ajo is a group saving club, also called esusu, tanda, susu, chit fund or ROSCA (rotating savings and credit association). Everyone pays the same amount each round, and each round one member takes the whole pot, until everyone has had a turn. Here the rules live in a contract on Monad: everyone locks a deposit first (returned at the end, minus any payment they miss), a Chainlink CRE workflow draws the payout order from the live Bitcoin price, and each round pays out automatically when its timer ends.
+        </div>
+      </details>
+      <div className="ds" style={{ marginBottom: 8 }}>
+        Spendable: {fmt(spendable)}{bal > 0n ? ` · ${fmt(bal)} waiting in your wallet` : ""}
+      </div>
       <div className="posacts" style={{ marginBottom: 10 }}>
-        {bal > 0n && <button className="mini pay" onClick={moveToSpendable} disabled={busy}>Move {cusd(bal)} to spendable</button>}
+        {bal > 0n && btn(`Move ${fmt(bal)} to spendable`, () => moveMoney(), true)}
         <button className="mini pay" onClick={() => setShowForm(!showForm)}>{showForm ? "Close" : "Start an on-chain Ajo"}</button>
       </div>
 
@@ -343,7 +396,6 @@ export default function OnchainAjo({
               ["Circle name", fName, setFName],
               [`Each member pays per round (${symbol})`, fAmt, setFAmt],
               ["Security deposit, as a multiple of one payment (1 or more)", fMult, setFMult],
-              
               ["Number of members (2 to 20)", fSize, setFSize],
             ] as [string, string, (v: string) => void][]
           ).map(([label, value, set]) => (
@@ -383,16 +435,11 @@ export default function OnchainAjo({
                   const a = b.address.toLowerCase();
                   const on = picked.includes(a);
                   return (
-                    <button
-                      key={a}
-                      className={"ajochip" + (on ? " on" : "")}
-                      style={{ cursor: "pointer", font: "inherit" }}
-                      onClick={() => {
-                        const next = on ? picked.filter((x) => x !== a) : [...picked, a];
-                        setPicked(next);
-                        if (next.length) setFSize(String(Math.min(20, next.length + 1)));
-                      }}
-                    >
+                    <button key={a} className={"ajochip" + (on ? " on" : "")} style={{ cursor: "pointer", font: "inherit" }} onClick={() => {
+                      const next = on ? picked.filter((x) => x !== a) : [...picked, a];
+                      setPicked(next);
+                      if (next.length) setFSize(String(Math.min(20, next.length + 1)));
+                    }}>
                       {on ? "✓ " : ""}{b.name}
                     </button>
                   );
@@ -401,13 +448,12 @@ export default function OnchainAjo({
             ))}
           </div>
           <div className="ds" style={{ marginBottom: 8 }}>
-            You lock the deposit now. Other members join from their own Cowrie and lock the same deposit. When the circle is full, Chainlink CRE draws the payout order, and it pays out each round when the timer ends.
+            You lock the deposit now. Other members join from their own Cowrie and lock the same deposit. When the circle is full, the payout order is drawn from the live Chainlink BTC price, and each round pays out automatically when its timer ends.
           </div>
           <div className="posacts"><button className="mini pay" onClick={create} disabled={busy}>Create circle</button></div>
         </div>
       )}
 
-      {focusId && loaded && !views.some((x) => x.id === focusId) && (<div className="ds" style={{ marginBottom: 8 }}>Circle #{focusId} is not open to you. It may be invite-only, full or already running.</div>)}
       {loaded && (
         <div className="ds" style={{ margin: "0 0 8px", fontWeight: 600 }}>
           {counts.live ? `${counts.live} live circle${counts.live === 1 ? "" : "s"} right now` : "No live circle right now"}
@@ -415,69 +461,19 @@ export default function OnchainAjo({
           {counts.join ? ` · ${counts.join} you can join` : ""}
         </div>
       )}
+      {error && <div className="ds" style={{ marginBottom: 8 }}>{loaded ? `Showing the last known state. ${error}` : `Could not reach Monad just now. Retrying. ${error}`}</div>}
       <div className="posacts" style={{ marginBottom: 10 }}>
         {([["live", "Live"], ["open", "Open"], ["join", "Join"], ["done", "Completed"]] as ["live" | "open" | "join" | "done", string][]).map(([k, lab]) => (
           <button key={k} className={"mini " + (effTab === k ? "pay" : "ghost")} onClick={() => setSecTab(k)}>{lab} {counts[k]}</button>
         ))}
       </div>
-      {shown.length === 0 ? (
-        <p className="muted" style={{ marginTop: 2 }}>{loaded ? (views.length ? "Nothing here right now. Try another tab above." : "No on-chain circles yet. Start one, or wait for a friend to start one you can join.") : "Loading your circles..."}</p>
-      ) : (
-        shown.map((v) => {
-          const left = v.endsAt - Math.floor(Date.now() / 1000);
-          const collector = v.order[v.round - 1];
-          return (
-            <div className="pcard" key={v.id} style={{ marginBottom: 10 }}>
-              <div className="prow" style={{ cursor: "default" }}>
-                <span className="prl">
-                  <b>{v.name}</b>
-                  <small>#{v.id} · {cusd(v.contribution)} each · {v.members.length}/{v.maxMembers} members{v.inviteOnly ? " · invite-only" : ""}</small>
-                </span>
-                <span className="prr"><b>{AJO_STATUS[v.status]}</b></span>
-              </div>
-              <div className="posexp">
-                {v.status === 0 && !v.mine && (
-                  <>
-                    <div className="ds" style={{ marginBottom: 6 }}>Join with a {cusd(v.deposit)} deposit. You get it back at the end, minus any payment you miss.</div>
-                    <div className="posacts"><button className="mini pay" onClick={() => join(v)} disabled={busy}>Join · lock {cusd(v.deposit)}</button></div>
-                  </>
-                )}
-                {v.status === 0 && v.mine && (
-                  <div className="ds">Waiting for {v.maxMembers - v.members.length} more {v.maxMembers - v.members.length === 1 ? "member" : "members"}. Friends can join from their own Cowrie.</div>
-                )}
-                {v.status === 1 && <div className="ds">Everyone is in. Waiting for the fair draw from Chainlink CRE.</div>}
-                {v.status === 2 && (
-                  <>
-                    <div className="ds" style={{ marginBottom: 6 }}>Payout order <span style={{ color: "var(--brass)" }}>· drawn by Chainlink CRE from the live BTC price</span></div>
-                    <div className="ajorder">
-                      {v.order.map((a, pos) => (
-                        <span key={pos} className={"ajochip" + (pos === v.round - 1 ? " on" : "")}>{pos + 1}. {who(a)}</span>
-                      ))}
-                    </div>
-                    <div className="ds" style={{ margin: "8px 0" }}>
-                      {left > 0 ? `Round ${v.round} ends in ${dur(left)}.` : `Round ${v.round} time is up. Chainlink CRE settles it and pays the pot to ${collector ? who(collector) : "the collector"}.`}
-                    </div>
-                    {v.mine && !v.paidNow && left > 0 && (
-                      <div className="posacts"><button className="mini pay" onClick={() => pay(v)} disabled={busy}>Pay {cusd(v.contribution)} for round {v.round}</button></div>
-                    )}
-                    {v.mine && v.paidNow && <span className="muted2">You have paid for this round.</span>}
-                  </>
-                )}
-                {(v.status === 3 || v.status === 4) && (
-                  <>
-                    <div className="ds" style={{ marginBottom: 6 }}>{v.status === 3 ? "Circle complete. Every round was paid out automatically." : "Circle cancelled."}</div>
-                    {v.mine && v.myDeposit > 0n && (
-                      <div className="posacts"><button className="mini pay" onClick={() => withdraw(v)} disabled={busy}>Withdraw {cusd(v.myDeposit)} deposit</button></div>
-                    )}
-                  </>
-                )}
-                {v.mine && v.status === 0 && (<div className="posacts" style={{ marginTop: 8 }}><button className="mini pay" onClick={() => share(v)}>Share link</button></div>)}
-                {v.mine && v.myStrikes > 0 && <div className="ds" style={{ marginTop: 6 }}>Missed payments: {v.myStrikes}</div>}
-              </div>
-            </div>
-          );
-        })
+
+      {focusId && loaded && !visible.some((c) => c.id === focusId) && (
+        <div className="ds" style={{ marginBottom: 8 }}>Circle #{focusId} is not open to you. It may be invite-only, full, already running, or older than the most recent 12.</div>
       )}
+      {!loaded ? <p className="muted">Loading your circles...</p> : shown.length === 0 ? (
+        <p className="muted" style={{ marginTop: 2 }}>{visible.length ? "Nothing here right now. Try another tab above." : "No on-chain circles yet. Start one, or wait for a friend to start one you can join."}</p>
+      ) : shown.map(card)}
     </div>
   );
 }
