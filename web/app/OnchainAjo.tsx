@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ajoAbi, AJO_ADDRESS } from "../lib/ajo";
 import { useAjo, refreshAjoNow, fmtDur, fmtLen, type Circle } from "../lib/ajoStore";
-import { fundWallet, moveToSpendable, backupDraw, ajoTarget } from "../lib/ajoActions";
+import { fundWallet, moveSome, backupDraw, ajoTarget } from "../lib/ajoActions";
+import { reserveOf } from "../lib/ajoIntent";
 
 type RunUi = { description?: string; successHeader?: string; title?: string; buttonText?: string };
 type RunFn = (fn: string, args: unknown[], ui?: RunUi, target?: { address: `0x${string}`; abi: any }) => Promise<string>;
@@ -25,7 +26,7 @@ const inputStyle = {
 type Detail = { key: string; rounds: { round: number; paid: string[]; missed: string[] }[]; partial: boolean };
 
 export default function OnchainAjo({
-  addr, publicClient, run, busy, setBusy, flash, errText, fmt, toU, symbol, perUsd, spendable, book, prefill, focusId, refresh,
+  addr, publicClient, run: runProp, busy, setBusy, flash, errText, fmt, toU, symbol, perUsd, spendable, book, prefill, focusId, refresh, say,
 }: {
   addr?: `0x${string}`;
   publicClient: any;
@@ -43,8 +44,18 @@ export default function OnchainAjo({
   prefill: { name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null;
   focusId: number | null;
   refresh?: () => Promise<unknown> | void;
+  say?: (m: any) => void;
 }) {
   const { circles, bal, fallbackEnabled, fallbackDelay, loaded, error } = useAjo(publicClient, addr, { fast: true });
+
+  // Every on-chain step taken from this sheet also leaves a receipt in the chat.
+  const run: RunFn = async (fn, args, ui, target) => {
+    const h = await runProp(fn, args, ui, target);
+    try { say?.({ who: "cowrie", tone: "good", text: `${ui?.successHeader || "Done"} ✓ ${ui?.description || ui?.title || fn}\nTransaction ${h.slice(0, 10)}…${h.slice(-6)}` }); } catch {}
+    return h;
+  };
+  const reserve = reserveOf(circles);
+  const movable = bal > reserve ? bal - reserve : 0n;
   const me = (addr || "").toLowerCase();
   const ctx = { addr: addr as `0x${string}`, publicClient, run, spendable, fmt };
 
@@ -126,8 +137,7 @@ export default function OnchainAjo({
     setBusy(true);
     try {
       const ok = await fn();
-      await refreshAjoNow();
-      try { await refresh?.(); } catch {}
+      await Promise.all([refreshAjoNow(), Promise.resolve(refresh?.()).catch(() => {})]);
       setAsk("");
       if (ok !== false) flash(okMsg);
     } catch (e) {
@@ -208,7 +218,7 @@ export default function OnchainAjo({
   });
   const backup = (c: Circle) => act("Order drawn by the backup", async () => { await backupDraw(ctx, c.id); });
   const moveMoney = () => act("Moved to spendable", async () => {
-    const moved = await moveToSpendable(ctx);
+    const moved = await moveSome(ctx, movable);
     if (moved <= 0n) { flash("Nothing in your wallet to move"); return false; }
   });
 
@@ -408,10 +418,10 @@ export default function OnchainAjo({
         </div>
       </details>
       <div className="ds" style={{ marginBottom: 8 }}>
-        Spendable: {fmt(spendable)}{bal > 0n ? ` · ${fmt(bal)} waiting in your wallet` : ""}
+        Spendable: {fmt(spendable)}{movable > 0n ? ` · ${fmt(movable)} waiting in your wallet` : ""}{reserve > 0n ? ` · ${fmt(reserve)} set aside for auto-pay` : ""}
       </div>
       <div className="posacts" style={{ marginBottom: 10 }}>
-        {bal > 0n && btn(`Move ${fmt(bal)} to spendable`, () => moveMoney(), true)}
+        {movable > 0n && btn(`Move ${fmt(movable)} to spendable`, () => moveMoney(), true)}
         <button className="mini pay" onClick={() => setShowForm(!showForm)}>{showForm ? "Close" : "Start an on-chain Ajo"}</button>
       </div>
 
@@ -497,6 +507,7 @@ export default function OnchainAjo({
       {focusId && loaded && !visible.some((c) => c.id === focusId) && (
         <div className="ds" style={{ marginBottom: 8 }}>Circle #{focusId} is not open to you. It may be invite-only, full, already running, or older than the most recent 12.</div>
       )}
+      {busy && (<div className="ajobusy">Working on it. If a wallet pop-up appears, confirm it. Buttons are paused until this finishes.</div>)}
       {!loaded ? <p className="muted">Loading your circles...</p> : shown.length === 0 ? (
         <p className="muted" style={{ marginTop: 2 }}>{visible.length ? "Nothing here right now. Try another tab above." : "No on-chain circles yet. Start one, or wait for a friend to start one you can join."}</p>
       ) : shown.map(card)}

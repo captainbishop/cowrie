@@ -4,7 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
-import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { detectBill, billStart, billNext, billReceipt } from "../lib/bills"; import type { BillState, BillSay } from "../lib/bills"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { detectBill, billStart, billNext, billReceipt } from "../lib/bills"; import type { BillState, BillSay } from "../lib/bills"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import { parseAjoText } from "../lib/ajoIntent"; import { refreshAjoNow } from "../lib/ajoStore"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -743,7 +743,7 @@ export default function CowrieApp() {
       else if (/^\s*(yes|yeah|yep|yup|sure|ok|okay|confirm|do it|go ahead)\b/i.test(text)) {
         setInput(""); say({ who: "you", text });
         ajoPending.current = null;
-        setAjoExec({ kind: pend.kind, id: pend.id, stamp: Date.now() });
+        setAjoExec({ steps: pend.steps, stamp: Date.now() });
         return;
       } else if (/^\s*(no|nope|not now|cancel|stop|leave it)\b/i.test(text)) {
         setInput(""); say({ who: "you", text });
@@ -751,6 +751,13 @@ export default function CowrieApp() {
         say({ who: "cowrie", text: "Okay, I will not do it. Ask me any time." });
         return;
       } else ajoPending.current = null;
+    }
+    {
+      // Ajo requests are recognised here, from your live circles, before the AI sees them. The AI explains; the app acts.
+      if (!awaitingName.current && AJO_ADDRESS && /\b(pay|join|withdraw|refund|collect|claim|move|transfer|status|ajo|aj+o+|circle|pot|share|deposit|round|esusu|thrift|payout|winnings?|how'?s|progress|turn)\b/i.test(text)) {
+        const plan = parseAjoText(text);
+        if (plan) { setInput(""); say({ who: "you", text }); setAjoCmd({ plan, stamp: Date.now() }); return; }
+      }
     }
     if (awaitingName.current) {
       if (/\d|0x/i.test(text) || text.split(/\s+/).length > 6) awaitingName.current = false;
@@ -848,7 +855,7 @@ export default function CowrieApp() {
       }
       else if (it.action === "ajoDo") {
         const w = ["pay", "join", "withdraw", "move", "status"].includes(String(it.what)) ? String(it.what) : "status";
-        setAjoCmd({ what: w as AjoCommand["what"], name: it.name ? String(it.name) : undefined, stamp: Date.now() });
+        setAjoCmd({ plan: w === "status" ? { type: "status", name: it.name ? String(it.name) : undefined } : { type: "do", kinds: [w === "pay" ? "pay" : w === "join" ? "join" : w === "withdraw" ? "withdraw" : "move"], name: it.name ? String(it.name) : undefined }, stamp: Date.now() });
       }
       else if (it.action === "ajo") {
         { const fromCur = (CURRENCIES[(it.currency && it.currency !== "AUTO" ? it.currency : ccy)] || CURRENCIES.NGN).perUsd; const toCur = (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd; const a0 = it.amount && Number(it.amount) > 0 ? (Number(it.amount) / fromCur) * toCur : undefined; setAjoPrefill({ name: it.name ? String(it.name) : undefined, amount: a0, minutes: typeof it.minutes === "number" && it.minutes > 0 ? it.minutes : undefined, invitees: Array.isArray(it.members) ? it.members.map((x: unknown) => String(x)) : [], stamp: Date.now() }); }
@@ -974,7 +981,7 @@ export default function CowrieApp() {
             {homePanel === "ajo" && (
               <div className="sheet">
                 <div className="sheethead"><span>Ajo circle</span><button className="xbtn" aria-label="Close" onClick={() => setHomePanel(null)}>✕</button></div>
-                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} book={book} prefill={ajoPrefill} focusId={linkCircle} refresh={refresh} />
+                <OnchainAjo addr={addr as `0x${string}` | undefined} publicClient={publicClient} run={run} busy={busy} setBusy={setBusy} flash={flash} errText={txErr} fmt={cfmt} toU={(n: number) => toUnits(n, ccy)} symbol={(CURRENCIES[ccy] || CURRENCIES.NGN).symbol} perUsd={(CURRENCIES[ccy] || CURRENCIES.NGN).perUsd} spendable={spendable} book={book} prefill={ajoPrefill} focusId={linkCircle} refresh={refresh} say={say} />
                 {true ? null : ajos.length === 0 ? <p className="muted" style={{ marginTop: 2 }}>Tell Cowrie &ldquo;start an ajo of ₦20,000 with Mum and Tunde&rdquo;. Everyone contributes each cycle and takes turns collecting, and the turn order is drawn from a live Chainlink price so no one can rig it.</p> : ajos.map((c) => { const turn = c.round % c.members.length; const recipient = c.members[c.order[turn]]; const done = c.round >= c.members.length; const mine = recipient.name === (firstName || "You"); const daysLeft = c.nextISO ? Math.ceil((new Date(c.nextISO).getTime() - Date.now()) / 86400000) : null; const due = daysLeft !== null && daysLeft <= 0; return (
                   <div className="pcard" key={c.id}>
                     <div className="prow" style={{ cursor: "default" }}><span className="prl"><b>{c.name}</b><small>{amtStr(c.amount, c.currency)} each · {c.members.length} people · cycle {Math.min(c.round + 1, c.members.length)}/{c.members.length}</small></span><button className="iconbtn" aria-label="Remove" onClick={() => removeAjo(c.id)}><Icon size={15}><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></Icon></button></div>

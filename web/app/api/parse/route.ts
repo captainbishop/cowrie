@@ -167,6 +167,7 @@ RULES
 - NEVER-MIND AND SMALL TALK: if the user cancels or drops something (nvm, never mind, forget it, leave it, abeg leave am, scratch that, cancel, ignore me), answer with one short friendly line that drops it and invites them back. Do not ask for the missing detail again and never say you did not catch it. Greetings, thanks, laughter (lol, haha), praise (you bad, you too much, nice one), exclamations (chai, omo, wahala, haba, wow), fillers (hmm, ok, k, bet, aight) and plain chat are all "reply" actions with a warm one-line answer in the user's own style.
 - SLANG AND TYPOS: understand typos, abbreviations and slang in English (nvm, idk, tbh, ngl, rn, imo, fr, lowkey, bet, no cap, fire, vibes, bro, bruh, omg, brb, ty, thx, pls, plz, wanna, gonna, gimme), in Nigerian Pidgin (dey, wetin, abeg, oya, sharp sharp, e don do, I dey, na so, make we, how far, you dey play or dey plizzy or you dey joke meaning "you are kidding", often said sarcastically) and in mixed Pidgin and English. Judge the meaning from the whole sentence and the conversation, not from single words, and fix obvious typos silently.
 - UNKNOWN SLANG: when a word or phrase is genuinely unfamiliar, do not say you did not catch it and do not list what you can do. Ask in one short line what it means, and when they explain it, save the meaning with "remember".
+- NEVER CLAIM AN ACTION: you cannot move money. Never say anything is done, sent, paid, moved, withdrawn or collected. The app asks the user to confirm and then shows its own receipt.
 - MEMORY: you are given the recent conversation, the user's recent wallet activity and their saved chats. Before saying you have no record of something, check all three. If a payment, Ajo share or send appears there, it happened; say so plainly with the amount and who.
 - HOW COWRIE'S OWN FEATURES WORK, so you explain them correctly and never say a built feature does not exist:
   Ajo (on-chain): an Ajo circle is a real contract on Monad. The creator picks the amount each person pays per round, a security deposit (at least one payment, bigger is safer), the round length and the number of members. Members join from their OWN Cowrie account and lock the deposit, so the creator cannot add people for them. When the circle is full, a Chainlink CRE workflow draws the payout order from the live Chainlink BTC price, so nobody can rig who collects first, and records it on-chain. Each round, everyone pays their share before the timer ends; when it ends, the workflow settles the round and the whole pot goes to that round's collector. A missed payment is taken from the member's deposit so the collector is still paid in full, and the member gets a strike. After the last round everyone withdraws what is left of their deposit. Circles can be invite-only, so only the people the creator names can join. How people join, exactly: there is NO Share button in the chat and no code to type. An open circle shows up in every Cowrie user's Ajo sheet on Home with a Join button. An invite-only circle shows up only for the people the creator invited, and only in their own Cowrie account (the wallet address saved in People must be that account's address); they also get a bell alert when their app is open. The creator of a circle that is still open can tap Share link on the circle's card in the Ajo sheet, which sends a link that opens Cowrie straight to that circle with a Join button. Never invent any other way to join and never say a code exists.
@@ -275,6 +276,17 @@ export async function POST(req: NextRequest) {
   // If the AI service did not answer, say so instead of pretending the message was not understood.
   if (!llm && (intent as { action?: string }).action === "reply" && /\bcatch\b/i.test((intent as { message?: string }).message || "")) {
     (intent as { message?: string }).message = `My thinking service is busy for a moment, ${nm}. Please send that again in a few seconds.`;
+  }
+  {
+    // The AI cannot move money. If it answers a money request with a made-up "done", replace it.
+    const r1 = intent as { action?: string; message?: string; options?: string[] };
+    const m1 = String(r1.message || "");
+    if (r1.action === "reply" && /\b(move|withdraw|collect|claim|pay|transfer|join|refund)\b/i.test(text)
+      && /\b(done|sorted|completed|now spendable|has been (moved|sent|paid|withdrawn)|i('| ha)ve (moved|sent|paid|withdrawn)|coming back to you|check activity)\b/i.test(m1)
+      && /\b(pot|deposit|withdraw|spendable|ajo|circle|round|payout|share)\b/i.test(m1)) {
+      r1.message = `I have not moved anything yet, ${nm}. Say what you want in one line, like "move my pot", "withdraw my deposit" or "pay my share", and I will ask you to confirm before any money moves.`;
+      r1.options = ["Move my pot", "Withdraw my deposit", "Pay my share", "Ajo status"];
+    }
   }
   const io = intent as { message?: string; reply?: string; reason?: string };
   if (io.message) io.message = deDash(io.message);

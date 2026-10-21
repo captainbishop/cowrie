@@ -280,3 +280,16 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* Receipts and summaries keep their line breaks */
 .bubble { white-space: pre-line; }
+
+/* Ajo sheet: buttons look like buttons, status chips look like labels */
+.sheet .mini { font-weight: 700; cursor: pointer; transition: transform .08s ease, background .15s ease, box-shadow .15s ease; }
+.sheet .mini.ghost { background: transparent; color: var(--brand); border: 1.5px solid var(--brand); }
+.sheet .mini.ghost:hover { background: rgba(124,108,255,.12); }
+.sheet .mini.pay { box-shadow: 0 6px 16px -8px rgba(80,60,220,.7); }
+.sheet .mini:active:not(:disabled) { transform: scale(.96); }
+.sheet .mini:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; filter: grayscale(.4); }
+.sheet .ajorder span.ajochip { background: transparent; border: 0; border-left: 3px solid var(--border); border-radius: 0; padding: 2px 8px; font-size: 12.5px; color: var(--dim); }
+.sheet .ajorder span.ajochip.on { border-left-color: var(--brand); color: var(--text); font-weight: 700; }
+.sheet button.ajochip { background: var(--surface-2); border: 1.5px solid var(--border); color: var(--text); cursor: pointer; border-radius: 999px; }
+.sheet button.ajochip.on { background: linear-gradient(135deg,var(--brand),var(--brand-2)); color: #fff; border-color: transparent; }
+.ajobusy { margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; background: rgba(124,108,255,.14); color: var(--text); }

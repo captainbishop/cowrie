@@ -61,3 +61,16 @@ export async function backupDraw(ctx: Ctx, id: number): Promise<void> {
   }
   await ctx.run("finishFallbackDraw", [BigInt(id)], { title: "Backup draw, step 2 of 2", description: "Records the payout order.", successHeader: "Drawn", buttonText: "Finish" }, t);
 }
+
+/** Moves `amount` (at most what the wallet holds) back into spendable. Returns the amount moved. */
+export async function moveSome(ctx: Ctx, amount: bigint): Promise<bigint> {
+  const have = (await ctx.publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "balanceOf", args: [ctx.addr] })) as bigint;
+  const amt = amount > have ? have : amount;
+  if (amt <= 0n) return 0n;
+  const allowed = (await ctx.publicClient.readContract({ address: addresses.usd, abi: tokenAbi, functionName: "allowance", args: [ctx.addr, addresses.vault] })) as bigint;
+  if (allowed < amt) {
+    await ctx.run("approve", [addresses.vault, MAX], { title: "Allow Cowrie", description: "Lets Cowrie move your Ajo money back into spendable.", successHeader: "Allowed", buttonText: "Allow" }, { address: addresses.usd, abi: tokenAbi });
+  }
+  await ctx.run("deposit", [amt], { title: "Move to spendable", description: `${ctx.fmt(amt)} back to your spendable balance.`, successHeader: "Moved", buttonText: "Move" }, { address: addresses.vault, abi: vaultDepositAbi });
+  return amt;
+}
