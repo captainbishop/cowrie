@@ -581,12 +581,49 @@ export default function CowrieApp() {
     if (out.later && out.later.length) { const later = out.later; setTimeout(() => billSayAll(later), out.delayMs || 900); }
   }
   function startBill(kind: Parameters<typeof billStart>[0]) { billAt.current = Date.now(); billRun(billStart(kind)); }
-  async function billInput(text: string) {
+  async function billInput(text: string, viaAI = false) {
     const st = billFlow.current;
     if (!st) return;
     const out = billNext(st, text);
+    // The steps could not read it, and the user wrote real words: let the AI work out what they mean.
+    const unchanged = !!out.state && out.state.step === st.step && JSON.stringify(out.state.d) === JSON.stringify(st.d) && !out.pay && !out.later;
+    if (!viaAI && unchanged && st.step !== "paying" && /[a-z]{3,}/i.test(text) && !/\b(change|edit|wrong|incorrect|mistake|switch|redo|different|another)\b/i.test(text)) {
+      setBusy(true);
+      const op = await billAsk(st, text, out);
+      setBusy(false);
+      if (op) { await billApply(st, text, op, out); return; }
+    }
     billRun(out);
     if (out.pay && out.state) await billPay(out.state, out.pay);
+  }
+  async function billAsk(st: BillState, text: string, out: ReturnType<typeof billNext>): Promise<any> {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 14000);
+      const d = st.d;
+      const flow = { kind: st.kind, step: st.step, question: out.say[0]?.text || "", fields: { company: d.disco, meterType: d.mtype, meter: d.meter, customer: d.cust?.name, amount: d.amount, total: d.total, network: d.net, phone: d.phone, plan: d.plan, provider: d.prov, card: d.card, package: d.pkg } };
+      const res = await fetch("/api/flow", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, flow, name: firstName, lang }), signal: ctrl.signal });
+      clearTimeout(timer);
+      const j = await res.json();
+      return j && j.ok && j.op ? j : null;
+    } catch { return null; }
+  }
+  async function billApply(st: BillState, text: string, op: any, fallback: ReturnType<typeof billNext>) {
+    const agreed = /\b(pay|yes|yeah|yep|confirm|go ahead|proceed|do it|sure|ok|okay)\b/i.test(text);
+    if (op.op === "cancel") { billFlow.current = null; say({ who: "cowrie", text: "Okay, I cancelled that. Nothing was paid." }); return; }
+    if (op.op === "say" && op.text) { say({ who: "cowrie", text: String(op.text), options: fallback.say[0]?.options }); return; }
+    if (op.op === "redo") {
+      const map: Record<string, string> = { meter: "change meter number", company: "change company", amount: "change amount", type: "change type", network: "change network", number: "change phone number", plan: "change plan", card: "change card number", provider: "change provider", package: "change package" };
+      const cmd = map[String(op.what)];
+      if (cmd) { await billInput(cmd, true); return; }
+    }
+    if (op.op === "answer" && op.text) {
+      const ans = String(op.text).slice(0, 80);
+      if (/^\s*pay\b/i.test(ans) && !(st.step === "confirm" && agreed)) { say({ who: "cowrie", text: 'Say "pay" when you are ready to go ahead.', options: fallback.say[0]?.options }); return; }
+      await billInput(ans, true);
+      return;
+    }
+    billRun(fallback);
   }
   async function billPay(st: BillState, pay: { naira: number; title: string; desc: string }) {
     const units = toUnits(pay.naira, "NGN");
