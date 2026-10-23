@@ -4,7 +4,6 @@ node_modules
 web/.env.local
 artifacts
 cache
-deployments.json
 coverage
 coverage.json
 typechain-types

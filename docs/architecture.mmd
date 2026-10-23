@@ -1,0 +1,33 @@
+flowchart TD
+    App["Cowrie app: chat and wallet"]
+    Intent["Intent and bill-flow APIs"]
+    AI["AI providers"]
+    Wallet["Privy: user approval and signing"]
+    Contacts["Contacts API: Privy token verification"]
+    Redis["Redis: saved contacts"]
+    Vault["PolicyVault: payments, rules and DeFi"]
+    Ajo["AjoCircleV2: deposits, rounds and payouts"]
+    Registry["ScamRegistry"]
+    USD["cUSD"]
+    Assets["Mock assets"]
+    Feeds["Chainlink feeds: Monad mainnet"]
+    CRE["CRE simulation runner"]
+    Forwarder["MockForwarder"]
+    Keeper["AjoKeeperV2"]
+    App <-->|Structured actions| Intent
+    Intent <-->|Model calls| AI
+    App <-->|Authenticated contacts| Contacts
+    Contacts <-->|Read and write| Redis
+    App -->|User confirmation| Wallet
+    Wallet -->|Signed transactions| Vault
+    Wallet -->|Signed transactions| Ajo
+    Vault -->|Recipient check| Registry
+    Vault -->|Balances and transfers| USD
+    Vault -->|Swap pools| Assets
+    Ajo -->|Contributions and payouts| USD
+    Feeds -->|Guardian prices| App
+    Feeds -->|BTC/USD seed| CRE
+    Ajo -->|Read circle state| CRE
+    CRE -->|Signed report| Forwarder
+    Forwarder -->|onReport| Keeper
+    Keeper -->|Draw, settle, pull| Ajo

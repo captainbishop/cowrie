@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1480" viewBox="0 0 1600 1480" role="img" aria-labelledby="title desc" font-family="Segoe UI, Arial, sans-serif">
+<title id="title">Cowrie system architecture</title>
+<desc id="desc">The Cowrie app uses intent and bill-flow APIs with AI providers, and syncs saved contacts through Privy authentication and Redis. Users approve transactions through a Privy wallet. PolicyVault and AjoCircleV2 execute on Monad testnet. Chainlink mainnet feeds supply Guardian prices and a seed to the CRE simulation runner. CRE reads circle state and delivers reports through MockForwarder and AjoKeeperV2.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#262048"/><stop offset=".48" stop-color="#171332"/><stop offset="1" stop-color="#100e25"/></linearGradient>
+  <linearGradient id="brass"><stop stop-color="#b7872f"/><stop offset="1" stop-color="#e7c892"/></linearGradient>
+  <marker id="violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#c4b5fd" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker><marker id="gold" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#e7c892" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker><marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9" fill="none" stroke="#83d3e0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></marker>
+</defs>
+<rect width="1600" height="1480" rx="28" fill="url(#bg)"/>
+<rect x="1" y="1" width="1598" height="1478" rx="27" fill="none" stroke="#494065"/>
+<path d="M28 3H1572" stroke="url(#brass)" stroke-width="5"/>
+<circle cx="1500" cy="80" r="310" fill="#c4b5fd" opacity=".025"/>
+<circle cx="1500" cy="80" r="230" fill="none" stroke="#c4b5fd" stroke-opacity=".07"/>
+<g transform="translate(102 88)"><ellipse rx="20" ry="30" fill="url(#brass)"/><path d="M0-25C-7-12-7 12 0 25C7 12 7-12 0-25" fill="#171332"/><path d="M-11-15H-4M4-15H11M-11-7H-4M4-7H11M-11 1H-4M4 1H11M-11 9H-4M4 9H11M-11 17H-4M4 17H11" stroke="#171332" stroke-width="2"/></g>
+<text x="143" y="82" font-size="18" fill="#e7c892" font-weight="700" letter-spacing="4">COWRIE</text>
+<text x="143" y="126" font-size="42" fill="#f4f2fb" font-weight="650" >System architecture</text>
+<text x="80" y="185" font-size="24" fill="#b8b3d1" font-weight="400" >From a conversation to a confirmed on-chain action.</text>
+<rect x="1215" y="62" width="305" height="30" rx="15" fill="#30263d" stroke="none"/>
+<text x="1367.5" y="83" font-size="14" fill="#e7c892" font-weight="600" text-anchor="middle">CONVERSATIONAL FINANCE</text>
+<text x="1520" y="130" font-size="19" fill="#b8b3d1" font-weight="400" text-anchor="end">App · services · settlement</text>
+<text x="80" y="234" font-size="16" fill="#e7c892" font-weight="700" >01</text>
+<text x="122" y="234" font-size="16" fill="#b8b3d1" font-weight="650" letter-spacing="2">CONVERSATION</text>
+<rect x="80" y="258" width="440" height="152" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M102 259h396" stroke="#c4b5fd" stroke-opacity=".55" stroke-width="2"/>
+<text x="106" y="292" font-size="16" fill="#c4b5fd" font-weight="650" letter-spacing="1.6">EXPERIENCE</text>
+<text x="106" y="335" font-size="28" fill="#f4f2fb" font-weight="650" >Cowrie app</text>
+<text x="106" y="372" font-size="22" fill="#b8b3d1" font-weight="400" >Chat · Home · Activity · People</text>
+<rect x="600" y="258" width="400" height="152" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M622 259h356" stroke="#c4b5fd" stroke-opacity=".55" stroke-width="2"/>
+<text x="626" y="292" font-size="16" fill="#c4b5fd" font-weight="650" letter-spacing="1.6">APPLICATION LOGIC</text>
+<text x="626" y="335" font-size="28" fill="#f4f2fb" font-weight="650" >Intent &amp; bill APIs</text>
+<text x="626" y="372" font-size="22" fill="#b8b3d1" font-weight="400" >Structured actions · guided flows</text>
+<rect x="1080" y="258" width="440" height="152" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M1102 259h396" stroke="#c4b5fd" stroke-opacity=".55" stroke-width="2"/>
+<text x="1106" y="292" font-size="16" fill="#c4b5fd" font-weight="650" letter-spacing="1.6">LANGUAGE</text>
+<text x="1106" y="335" font-size="28" fill="#f4f2fb" font-weight="650" >AI providers</text>
+<text x="1106" y="372" font-size="22" fill="#b8b3d1" font-weight="400" >Conversation → structured intent</text>
+<path d="M520 334H600" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<path d="M600 344H520" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<path d="M1000 334H1080" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<path d="M1080 344H1000" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<text x="80" y="490" font-size="16" fill="#e7c892" font-weight="700" >02</text>
+<text x="122" y="490" font-size="16" fill="#b8b3d1" font-weight="650" letter-spacing="2">SERVICES</text>
+<rect x="80" y="514" width="440" height="160" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M102 515h396" stroke="#c4b5fd" stroke-opacity=".55" stroke-width="2"/>
+<text x="106" y="548" font-size="16" fill="#c4b5fd" font-weight="650" letter-spacing="1.6">APPROVAL &amp; SIGNING</text>
+<text x="106" y="591" font-size="28" fill="#f4f2fb" font-weight="650" >Privy wallet</text>
+<text x="106" y="628" font-size="22" fill="#b8b3d1" font-weight="400" >Google / email · embedded wallet</text>
+<rect x="600" y="514" width="400" height="160" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M622 515h356" stroke="#c4b5fd" stroke-opacity=".55" stroke-width="2"/>
+<text x="626" y="548" font-size="16" fill="#c4b5fd" font-weight="650" letter-spacing="1.6">AUTHENTICATED API</text>
+<text x="626" y="591" font-size="28" fill="#f4f2fb" font-weight="650" >Contact sync</text>
+<text x="626" y="628" font-size="22" fill="#b8b3d1" font-weight="400" >Privy access-token verification</text>
+<rect x="1080" y="514" width="440" height="160" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M1102 515h396" stroke="#c4b5fd" stroke-opacity=".55" stroke-width="2"/>
+<text x="1106" y="548" font-size="16" fill="#c4b5fd" font-weight="650" letter-spacing="1.6">PERSISTENCE</text>
+<text x="1106" y="591" font-size="28" fill="#f4f2fb" font-weight="650" >Redis</text>
+<text x="1106" y="628" font-size="22" fill="#b8b3d1" font-weight="400" >Saved contacts across sessions</text>
+<path d="M300 410V514" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<text x="321" y="451" font-size="17" fill="#c4b5fd" font-weight="400" >Confirm &amp; sign</text>
+<path d="M520 384H553V445H800V514" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<text x="618" y="435" font-size="17" fill="#c4b5fd" font-weight="400" >Saved contacts</text>
+<path d="M1000 588H1080" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<path d="M1080 600H1000" fill="none" stroke="#c4b5fd" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#violet)" />
+<text x="1040" y="571" font-size="15" fill="#c4b5fd" font-weight="500" text-anchor="middle">sync</text>
+<rect x="64" y="788" width="1472" height="254" rx="24" fill="#211c34" stroke="#796244"/>
+<path d="M300 674V744H1155V864" fill="none" stroke="#e7c892" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#gold)" />
+<path d="M440 744V864" fill="none" stroke="#e7c892" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#gold)" />
+<text x="738" y="731" font-size="19" fill="#e7c892" font-weight="550" >User-approved transactions</text>
+<text x="80" y="831" font-size="16" fill="#e7c892" font-weight="700" >03</text>
+<text x="122" y="831" font-size="16" fill="#b8b3d1" font-weight="650" letter-spacing="2">MONAD TESTNET</text>
+<rect x="1320" y="807" width="180" height="30" rx="15" fill="#3d303c" stroke="none"/>
+<text x="1410" y="828" font-size="14" fill="#e7c892" font-weight="600" text-anchor="middle">CHAIN ID 10143</text>
+<rect x="96" y="864" width="690" height="140" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M118 865h646" stroke="#e7c892" stroke-opacity=".55" stroke-width="2"/>
+<text x="122" y="898" font-size="16" fill="#e7c892" font-weight="650" letter-spacing="1.6">VAULT CONTRACT</text>
+<text x="122" y="941" font-size="28" fill="#f4f2fb" font-weight="650" >PolicyVault</text>
+<text x="122" y="978" font-size="22" fill="#b8b3d1" font-weight="400" >Payments · rules · Earn · swaps · predictions</text>
+<rect x="451" y="881" width="153" height="30" rx="15" fill="#3c303d" stroke="none"/>
+<text x="527.5" y="902" font-size="14" fill="#e7c892" font-weight="600" text-anchor="middle">ScamRegistry</text>
+<rect x="614" y="881" width="146" height="30" rx="15" fill="#3c303d" stroke="none"/>
+<text x="687" y="902" font-size="14" fill="#e7c892" font-weight="600" text-anchor="middle">cUSD + assets</text>
+<rect x="830" y="864" width="658" height="140" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M852 865h614" stroke="#e7c892" stroke-opacity=".55" stroke-width="2"/>
+<text x="856" y="898" font-size="16" fill="#e7c892" font-weight="650" letter-spacing="1.6">SAVINGS CIRCLES</text>
+<text x="856" y="941" font-size="28" fill="#f4f2fb" font-weight="650" >AjoCircleV2</text>
+<text x="856" y="978" font-size="22" fill="#b8b3d1" font-weight="400" >Deposits · contributions · payouts · exits</text>
+<rect x="1390" y="881" width="73" height="30" rx="15" fill="#3c303d" stroke="none"/>
+<text x="1426.5" y="902" font-size="14" fill="#e7c892" font-weight="600" text-anchor="middle">cUSD</text>
+<text x="105" y="1030" font-size="17" fill="#e7c892" font-weight="400" >Contract state holds balances, financial rules, contributions and payout order.</text>
+<text x="80" y="1118" font-size="16" fill="#e7c892" font-weight="700" >04</text>
+<text x="122" y="1118" font-size="16" fill="#b8b3d1" font-weight="650" letter-spacing="2">AUTOMATION &amp; PRICE DATA</text>
+<rect x="80" y="1150" width="400" height="190" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M102 1151h356" stroke="#83d3e0" stroke-opacity=".55" stroke-width="2"/>
+<text x="106" y="1184" font-size="16" fill="#83d3e0" font-weight="650" letter-spacing="1.6">MONAD MAINNET · 143</text>
+<text x="106" y="1227" font-size="28" fill="#f4f2fb" font-weight="650" >Chainlink Data Feeds</text>
+<text x="106" y="1264" font-size="22" fill="#b8b3d1" font-weight="400" >BTC / USD · ETH / USD</text>
+<rect x="106" y="1291" width="253" height="30" rx="15" fill="#203845" stroke="none"/>
+<text x="232.5" y="1312" font-size="14" fill="#83d3e0" font-weight="600" text-anchor="middle">READ-ONLY ORACLE DATA</text>
+<rect x="580" y="1150" width="420" height="190" rx="20" fill="#221e43" stroke="#4a426e"/>
+<path d="M602 1151h376" stroke="#e7c892" stroke-opacity=".55" stroke-width="2"/>
+<text x="606" y="1184" font-size="16" fill="#e7c892" font-weight="650" letter-spacing="1.6">WORKFLOW</text>
+<text x="606" y="1227" font-size="28" fill="#f4f2fb" font-weight="650" >Chainlink CRE</text>
+<text x="606" y="1264" font-size="22" fill="#b8b3d1" font-weight="400" >Draw · settle · pull auto-pay</text>
+<rect x="606" y="1291" width="227" height="30" rx="15" fill="#3c303d" stroke="none"/>
+<text x="719.5" y="1312" font-size="14" fill="#e7c892" font-weight="600" text-anchor="middle">SIMULATION RUNNER</text>
+<rect x="1100" y="1150" width="420" height="190" rx="20" fill="#221e43" stroke="#4a426e"/>
+<text x="1126" y="1184" font-size="14" fill="#e7c892" font-weight="650" letter-spacing="1.8">REPORT DELIVERY</text>
+<text x="1126" y="1227" font-size="27" fill="#f4f2fb" font-weight="650" >MockForwarder</text>
+<path d="M1139 1240V1262" fill="none" stroke="#e7c892" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#gold)" />
+<text x="1126" y="1302" font-size="27" fill="#f4f2fb" font-weight="650" >AjoKeeperV2</text>
+<path d="M480 1230H580" fill="none" stroke="#83d3e0" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#blue)" />
+<text x="530" y="1215" font-size="15" fill="#83d3e0" font-weight="500" text-anchor="middle">BTC/USD</text>
+<path d="M1000 1230H1100" fill="none" stroke="#e7c892" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#gold)" />
+<text x="1050" y="1215" font-size="15" fill="#e7c892" font-weight="500" text-anchor="middle">report</text>
+<path d="M1310 1150V1004" fill="none" stroke="#e7c892" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#gold)" />
+<text x="1332" y="1090" font-size="17" fill="#e7c892" font-weight="400" >Circle actions</text>
+<path d="M885 1004V1080H790V1150" fill="none" stroke="#83d3e0" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#blue)" stroke-dasharray="7 7"/>
+<text x="815" y="1104" font-size="17" fill="#83d3e0" font-weight="400" >Circle state</text>
+<path d="M80 1230H38V334H80" fill="none" stroke="#83d3e0" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" marker-end="url(#blue)" stroke-dasharray="7 7"/>
+<text x="23" y="899" font-size="16" fill="#83d3e0" font-weight="500" transform="rotate(-90 23 899)">Live prices for Guardian</text>
+<path d="M80 1380H1520" stroke="#443a62"/>
+<circle cx="88" cy="1411" r="5" fill="#c4b5fd"/>
+<text x="105" y="1417" font-size="17" fill="#b8b3d1" font-weight="400" >Application requests</text>
+<circle cx="413" cy="1411" r="5" fill="#e7c892"/>
+<text x="430" y="1417" font-size="17" fill="#b8b3d1" font-weight="400" >Transactions &amp; reports</text>
+<circle cx="813" cy="1411" r="5" fill="#83d3e0"/>
+<text x="830" y="1417" font-size="17" fill="#b8b3d1" font-weight="400" >Read-only chain data</text>
+<text x="80" y="1452" font-size="17" fill="#b8b3d1" font-weight="400" >Chats, preferences and reminders stay on-device. Contact sync is backed by Privy + Redis.</text>
+</svg>

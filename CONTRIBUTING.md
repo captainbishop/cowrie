@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for taking a look. Cowrie is a hackathon project built on Monad testnet, and small fixes or ideas are welcome.
+Cowrie is an actively developed conversational wallet on Monad. Contributions to its payments, savings, DeFi features and shared savings circles are welcome.
 
 ## Setup
 

@@ -1,0 +1,156 @@
+<svg role="img" aria-label="Detailed Cowrie contract and API flow" font-family="Segoe UI, Arial, sans-serif" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1208.0721666666666 705.7" width="1208.0721666666666" height="705.7"><rect width="100%" height="100%" fill="#141231"/>
+
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="#c4b5fd" stroke="#c4b5fd" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="#c4b5fd" stroke="#c4b5fd" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="App" data-to="Intent" data-style="solid" data-arrow-start="true" data-arrow-end="true" data-label="Structured actions" points="899.7323333333334,194.10000000000002 899.7323333333334,218.10000000000014 1081.8891666666666,218.10000000000014 1081.8891666666666,310.4000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" marker-start="url(#arrowhead-start)" />
+<polyline class="edge" data-from="Intent" data-to="AI" data-style="solid" data-arrow-start="true" data-arrow-end="true" data-label="Model calls" points="1081.8891666666666,347.30000000000007 1081.8891666666666,463.60000000000014" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" marker-start="url(#arrowhead-start)" />
+<polyline class="edge" data-from="App" data-to="Contacts" data-style="solid" data-arrow-start="true" data-arrow-end="true" data-label="Authenticated contacts" points="850.3423333333333,194.10000000000002 850.3423333333333,242.10000000000014 839.2861666666665,242.10000000000014 839.2861666666665,310.4000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" marker-start="url(#arrowhead-start)" />
+<polyline class="edge" data-from="Contacts" data-to="Redis" data-style="solid" data-arrow-start="true" data-arrow-end="true" data-label="Read and write" points="839.2861666666665,347.30000000000007 839.2861666666665,463.60000000000014" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" marker-start="url(#arrowhead-start)" />
+<polyline class="edge" data-from="App" data-to="Wallet" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="User confirmation" points="800.9523333333334,194.10000000000002 800.9523333333334,218.10000000000002 502.25350000000003,218.10000000000002 502.25350000000003,310.4000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Wallet" data-to="Vault" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Signed transactions" points="541.1081666666666,347.30000000000007 541.1081666666666,371.30000000000007 595.2011666666667,371.30000000000007 595.2011666666667,463.60000000000014" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Wallet" data-to="Ajo" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Signed transactions" points="463.39883333333336,347.30000000000007 463.39883333333336,371.30000000000007 374.44433333333336,371.30000000000007 374.44433333333336,439.6000000000001 339.5828333333334,439.6000000000001 339.5828333333334,463.60000000000014" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Vault" data-to="Registry" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Recipient check" points="595.2011666666667,500.5000000000001 595.2011666666667,524.5000000000001 606.2573333333333,524.5000000000001 606.2573333333333,616.8000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Vault" data-to="USD" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Balances and transfers" points="529.8796666666667,500.5000000000001 529.8796666666667,524.5000000000001 491.0321666666667,524.5000000000001 491.0321666666667,592.8000000000001 410.83566666666667,592.8000000000001 410.83566666666667,616.8000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Vault" data-to="Assets" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Swap pools" points="660.5226666666666,500.5000000000001 660.5226666666666,548.5000000000001 755.4943333333333,548.5000000000001 755.4943333333333,616.8000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Ajo" data-to="USD" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Contributions and payouts" points="339.5828333333334,500.5000000000001 339.5828333333334,524.5000000000001 352.12416666666667,524.5000000000001 352.12416666666667,592.8000000000001 385.4903333333333,592.8000000000001 385.4903333333333,616.8000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Feeds" data-to="App" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Guardian prices" points="495.4146666666667,76.9 495.4146666666667,88.9 850.3423333333333,88.9 850.3423333333333,157.2" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Feeds" data-to="CRE" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="BTC/USD seed" points="420.6693333333333,76.9 420.6693333333333,133.2 80.5,133.2 80.5,592.8000000000001 104.06983333333335,592.8000000000001 104.06983333333335,616.8000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Ajo" data-to="CRE" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Read circle state" points="242.60750000000007,500.5000000000001 242.60750000000007,524.5000000000001 230.06616666666667,524.5000000000001 230.06616666666667,592.8000000000001 190.25283333333334,592.8000000000001 190.25283333333334,616.8000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="CRE" data-to="Forwarder" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Signed report" points="147.16133333333335,616.8000000000001 147.16133333333335,592.8000000000001 134.63216666666676,592.8000000000001 134.63216666666676,371.30000000000007 155.457,371.30000000000007 155.457,194.10000000000002" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Forwarder" data-to="Keeper" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="onReport" points="202.29133333333328,194.10000000000002 202.29133333333328,218.10000000000002 237.84816666666666,218.10000000000002 237.8481666666666,310.4000000000001" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="Keeper" data-to="Ajo" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Draw, settle, pull" points="237.8481666666666,347.30000000000007 237.84816666666666,439.6000000000001 242.60750000000007,439.6000000000001 242.60750000000007,463.60000000000014" fill="none" stroke="#8879b3" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="App" data-to="Intent" data-label="Structured actions">
+  <rect x="1029.3891666666666" y="225.10000000000014" width="104.96800000000003" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="1081.8731666666665" y="240.25000000000014" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Structured actions</text>
+</g>
+<g class="edge-label" data-from="Intent" data-to="AI" data-label="Model calls">
+  <rect x="1045.8891666666666" y="378.3000000000002" width="71.11" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="1081.4441666666667" y="393.45000000000016" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Model calls</text>
+</g>
+<g class="edge-label" data-from="App" data-to="Contacts" data-label="Authenticated contacts">
+  <rect x="777.2861666666665" y="249.1000000000001" width="123.976" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="839.2741666666666" y="264.2500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Authenticated contacts</text>
+</g>
+<g class="edge-label" data-from="Contacts" data-to="Redis" data-label="Read and write">
+  <rect x="795.7861666666665" y="402.3000000000002" width="86.55400000000002" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="839.0631666666666" y="417.45000000000016" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Read and write</text>
+</g>
+<g class="edge-label" data-from="App" data-to="Wallet" data-label="User confirmation">
+  <rect x="451.75350000000003" y="225.10000000000002" width="100.21600000000001" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="501.86150000000004" y="240.25000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">User confirmation</text>
+</g>
+<g class="edge-label" data-from="Wallet" data-to="Vault" data-label="Signed transactions">
+  <rect x="538.7011666666667" y="378.30000000000007" width="112.09600000000002" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="594.7491666666667" y="393.45000000000005" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Signed transactions</text>
+</g>
+<g class="edge-label" data-from="Wallet" data-to="Ajo" data-label="Signed transactions">
+  <rect x="317.94433333333336" y="378.30000000000007" width="112.09600000000002" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="373.99233333333336" y="393.45000000000005" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Signed transactions</text>
+</g>
+<g class="edge-label" data-from="Vault" data-to="Registry" data-label="Recipient check">
+  <rect x="559.2573333333333" y="531.5000000000001" width="93.08800000000001" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="605.8013333333333" y="546.6500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Recipient check</text>
+</g>
+<g class="edge-label" data-from="Vault" data-to="USD" data-label="Balances and transfers">
+  <rect x="426.5321666666667" y="531.5000000000001" width="128.13400000000001" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="490.5991666666667" y="546.6500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Balances and transfers</text>
+</g>
+<g class="edge-label" data-from="Vault" data-to="Assets" data-label="Swap pools">
+  <rect x="719.4943333333333" y="555.5000000000001" width="71.70400000000001" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="755.3463333333333" y="570.6500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Swap pools</text>
+</g>
+<g class="edge-label" data-from="Ajo" data-to="USD" data-label="Contributions and payouts">
+  <rect x="281.62416666666667" y="531.5000000000001" width="140.014" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="351.6311666666667" y="546.6500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Contributions and payouts</text>
+</g>
+<g class="edge-label" data-from="Feeds" data-to="App" data-label="Guardian prices">
+  <rect x="802.8423333333333" y="95.9" width="94.27600000000001" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="849.9803333333333" y="111.05000000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Guardian prices</text>
+</g>
+<g class="edge-label" data-from="Feeds" data-to="CRE" data-label="BTC/USD seed">
+  <rect x="36" y="346.00000000000006" width="88.93" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="80.465" y="361.15000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">BTC/USD seed</text>
+</g>
+<g class="edge-label" data-from="Ajo" data-to="CRE" data-label="Read circle state">
+  <rect x="181.56616666666667" y="531.5000000000001" width="96.05800000000002" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="229.59516666666667" y="546.6500000000001" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Read circle state</text>
+</g>
+<g class="edge-label" data-from="CRE" data-to="Forwarder" data-label="Signed report">
+  <rect x="93.13216666666676" y="378.30000000000007" width="82.39600000000002" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="134.33016666666677" y="393.45000000000005" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Signed report</text>
+</g>
+<g class="edge-label" data-from="Forwarder" data-to="Keeper" data-label="onReport">
+  <rect x="206.84816666666666" y="225.10000000000002" width="61.606" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="237.65116666666665" y="240.25000000000003" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">onReport</text>
+</g>
+<g class="edge-label" data-from="Keeper" data-to="Ajo" data-label="Draw, settle, pull">
+  <rect x="191.34816666666666" y="378.30000000000007" width="92.49400000000003" height="30.3" rx="2" ry="2" fill="#141231" stroke="#453c61" stroke-width="1" />
+  <text x="237.59516666666667" y="393.45000000000005" text-anchor="middle" font-size="11" font-weight="400" fill="#b8b3d1" dy="3.8499999999999996">Draw, settle, pull</text>
+</g>
+<g class="node" data-id="App" data-label="Cowrie app: chat and wallet" data-shape="rectangle">
+  <rect x="751.5623333333333" y="157.2" width="197.55999999999997" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="850.3423333333333" y="175.64999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Cowrie app: chat and wallet</text>
+</g>
+<g class="node" data-id="Intent" data-label="Intent and bill-flow APIs" data-shape="rectangle">
+  <rect x="995.7061666666666" y="310.4000000000001" width="172.36599999999999" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="1081.8891666666666" y="328.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Intent and bill-flow APIs</text>
+</g>
+<g class="node" data-id="AI" data-label="AI providers" data-shape="rectangle">
+  <rect x="1024.2346666666665" y="463.60000000000014" width="115.30900000000001" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="1081.8891666666666" y="482.0500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">AI providers</text>
+</g>
+<g class="node" data-id="Wallet" data-label="Privy: user approval and signing" data-shape="rectangle">
+  <rect x="385.6895" y="310.4000000000001" width="233.128" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="502.25350000000003" y="328.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Privy: user approval and signing</text>
+</g>
+<g class="node" data-id="Contacts" data-label="Contacts API: Privy token verification" data-shape="rectangle">
+  <rect x="710.8661666666667" y="310.4000000000001" width="256.8399999999999" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="839.2861666666666" y="328.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Contacts API: Privy token verification</text>
+</g>
+<g class="node" data-id="Redis" data-label="Redis: saved contacts" data-shape="rectangle">
+  <rect x="753.8441666666666" y="463.60000000000014" width="170.88399999999996" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="839.2861666666666" y="482.0500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Redis: saved contacts</text>
+</g>
+<g class="node" data-id="Vault" data-label="PolicyVault: payments, rules and DeFi" data-shape="rectangle">
+  <rect x="464.5581666666667" y="463.60000000000014" width="261.28599999999994" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="595.2011666666667" y="482.0500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">PolicyVault: payments, rules and DeFi</text>
+</g>
+<g class="node" data-id="Ajo" data-label="AjoCircleV2: deposits, rounds and payouts" data-shape="rectangle">
+  <rect x="145.63216666666676" y="463.60000000000014" width="290.926" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="291.0951666666667" y="482.0500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">AjoCircleV2: deposits, rounds and payouts</text>
+</g>
+<g class="node" data-id="Registry" data-label="ScamRegistry" data-shape="rectangle">
+  <rect x="543.7863333333333" y="616.8000000000001" width="124.94200000000001" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="606.2573333333333" y="635.2500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">ScamRegistry</text>
+</g>
+<g class="node" data-id="USD" data-label="cUSD" data-shape="rectangle">
+  <rect x="360.145" y="616.8000000000001" width="76.036" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="398.163" y="635.2500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">cUSD</text>
+</g>
+<g class="node" data-id="Assets" data-label="Mock assets" data-shape="rectangle">
+  <rect x="696.7283333333334" y="616.8000000000001" width="117.53200000000001" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="755.4943333333333" y="635.2500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Mock assets</text>
+</g>
+<g class="node" data-id="Feeds" data-label="Chainlink feeds: Monad mainnet" data-shape="rectangle">
+  <rect x="345.92400000000004" y="40" width="224.23599999999993" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="458.04200000000003" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">Chainlink feeds: Monad mainnet</text>
+</g>
+<g class="node" data-id="CRE" data-label="CRE simulation runner" data-shape="rectangle">
+  <rect x="60.97833333333335" y="616.8000000000001" width="172.366" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="147.16133333333335" y="635.2500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">CRE simulation runner</text>
+</g>
+<g class="node" data-id="Forwarder" data-label="MockForwarder" data-shape="rectangle">
+  <rect x="108.62266666666665" y="157.2" width="140.503" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="178.87416666666664" y="175.64999999999998" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">MockForwarder</text>
+</g>
+<g class="node" data-id="Keeper" data-label="AjoKeeperV2" data-shape="rectangle">
+  <rect x="176.85916666666662" y="310.4000000000001" width="121.97799999999998" height="36.900000000000006" rx="0" ry="0" fill="#242044" stroke="#524676" stroke-width="0.75" />
+  <text x="237.8481666666666" y="328.8500000000001" text-anchor="middle" font-size="13" font-weight="500" fill="#f4f2fb" dy="4.55">AjoKeeperV2</text>
+</g>
+</svg>
