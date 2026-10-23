@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://cowrie-amber.vercel.app">Try Cowrie</a> ·
-  <a href="#what-you-can-do">Capabilities</a> ·
+  <a href="#what-you-can-do-today">Capabilities</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#what-each-integration-does">Integrations</a> ·
   <a href="#run-the-web-app">Local setup</a> ·
@@ -27,27 +27,44 @@
 
 # Cowrie
 
-Cowrie is a stablecoin wallet you talk to. Send money, set savings rules, pay an allowance or use DeFi from the same conversation. You describe what you want in familiar language and amounts; Cowrie works out the action and takes it through your wallet to a contract on Monad.
+Cowrie is a conversational wallet for everyday finance and DeFi. The ambition is to bring the entire crypto stack behind a simple prompt, starting with everyday Nigerians and expanding to people worldwide. Monad provides the fast settlement layer for the transactions behind that conversation.
 
-Managing money usually means translating an ordinary intention into forms, account details and unfamiliar financial terms. Cowrie starts with the intention: "send 5,000 to Mum", "save 10% of everything I receive", or "swap 10,000 into bitcoin". Saved contacts, balances and follow-up questions supply the details the sentence leaves out. Payments, savings, price watches and shared savings circles sit alongside each other in the app.
+You describe what you want in your own words. The AI uses the conversation and your wallet context to interpret the request, explain available options and ask for missing details. Supported actions flow through your wallet to contracts on Monad. Today's app covers payments, savings, token swaps and shared savings circles, with more of the crypto stack to follow.
 
 Cowrie is built first for everyday use in Nigeria. It defaults to naira, understands Nigerian Pidgin and supports Igbo, Yoruba and Hausa alongside other languages. Google or email sign-in creates an embedded wallet through Privy, with gas sponsorship requested for transactions.
 
 **The [live app](https://cowrie-amber.vercel.app) runs on Monad testnet with cUSD test money.** Displayed naira amounts use demo conversion rates. Bill payments simulate service delivery, and the savings yield and traded assets are test tokens.
 
-## What you can do
+## Why Nigeria first
 
-| Capability | Try saying | What happens |
-|---|---|---|
-| Payments and contacts | "Send 5,000 to Mum" | Send cUSD through the vault to a saved contact. Incoming payments appear in history and trigger an in-app notice. |
-| Requests and bill splitting | "Request 3,000 from Tunde" or "split 30,000 three ways" | Prepare a request or split a shared amount between payers. |
-| Auto-save and spending limits | "Save 10% of everything I receive" or "don't let me spend more than 20,000 a day" | Set rules enforced by `PolicyVault`. Incoming vault credits can be split into savings; vault sends respect the daily cap. |
-| Allowances | "Give my son 2,000 a day" | Set a streaming allowance that the recipient claims as it accrues. |
-| Earn, swaps and predictions | "Earn 50,000" or "swap 10,000 into bitcoin" | Move funds into the demo Earn vault, trade cBTC/cETH/cGOLD in contract pools, or take a side in a prediction market. |
-| Guided bill demos | "Pay my light bill" or "buy 500 airtime" | Work through electricity, airtime, data or cable details, review the payment, and receive a demo receipt after the test-money transaction. |
-| Subscriptions and reminders | "Remind me before Netflix renews" | Track due dates and review renewal reminders in the app. Subscription payments use the demo merchant. |
-| Guardian price watches | "Watch bitcoin and alert me if it drops below $90,000" | Watch Chainlink prices while the app is running and offer an action when the threshold is crossed. |
-| Ajo circles | "Start ajo" or "pay my ajo share" | Create or join a rotating savings circle, contribute, manage auto-pay and collect payouts through the Ajo interface and chat. |
+Cowrie's growth strategy is to establish demand in Nigeria and expand from that foundation. Starting with a focused community gives the product a place to be tested against everyday financial needs and improved through direct feedback. The aim is to build a wallet people keep using at home, then carry what works into other markets.
+
+The people using Cowrie will shape its defining features and development priorities. Support for additional languages and display currencies already makes room for users beyond Nigeria. Feedback from each new market will also guide how the wallet adapts to local needs.
+
+## What you can do today
+
+You can start with a question or an everyday goal, then work through the details in conversation. These examples illustrate how Cowrie uses context:
+
+| A conversation | What the AI handles |
+|---|---|
+| "How does Earn work?" Then: "Put 20,000 naira there." | Explain the feature first, then use the earlier conversation to interpret "there" as the demo Earn vault and prepare the deposit. |
+| "Whenever money comes in, tuck away a tenth of it so I don't spend everything." | Interpret the savings goal and the fraction, then prepare a 10% auto-save rule for incoming vault credits. |
+| During an airtime payment: "Abeg, I picked the wrong network. Let me change am." | Understand the correction in the context of the current bill flow and return to the network choice. |
+| "Did I already send Mum the money?" | Use the recent wallet activity and conversation supplied to the assistant to answer a question about a previous payment. |
+
+The current testnet app supports the following actions:
+
+| Area | Available today |
+|---|---|
+| Payments and contacts | Send cUSD to saved contacts. Incoming payments appear in history and trigger an in-app notice. |
+| Requests and bill splitting | Prepare payment requests or divide a shared amount between payers. |
+| Auto-save and spending limits | Set a percentage of incoming vault credits to save and a daily cap on vault sends, enforced by `PolicyVault`. |
+| Allowances | Set a streaming allowance that the recipient claims as it accrues. |
+| Earn, swaps and predictions | Move funds into the demo Earn vault, trade cBTC/cETH/cGOLD in contract pools, or take a side in a prediction market. |
+| Guided bill payments | Work through electricity, airtime, data or cable details, review the payment, and receive a demo receipt after the test-money transaction. Service delivery is simulated. |
+| Subscriptions and reminders | Track due dates and review renewal reminders in the app. Subscription payments use the demo merchant. |
+| Guardian price watches | Watch Chainlink prices while the app is running and offer an action when a threshold is crossed. |
+| Ajo circles | Create or join a rotating savings circle, contribute, manage auto-pay and collect payouts through the Ajo interface and chat. |
 
 To try it, open the app, sign in and use **Add money** to mint cUSD into your test balance. Add a contact before sending by name. The Home screen also exposes the wallet actions directly. Vault sends check the on-chain scam registry and reject flagged recipients.
 
@@ -281,7 +298,9 @@ To send the reports as testnet transactions, configure the CLI signing account a
 
 ## Where Cowrie is going
 
-The next steps are credit backed by savings or token balances, routing swaps and savings into external Monad protocols, and merchant payments with QR checkout and recurring payouts. Real biller integrations would replace the simulated service flows.
+Cowrie's direction is to make DeFi applications and everyday financial services accessible from the same conversation, using Monad for fast settlement. Usage and feedback will shape which capabilities come next and how they work.
+
+Planned areas include credit backed by savings or token balances, routing swaps and savings into external Monad protocols, and merchant payments with QR checkout and recurring payouts. Real biller integrations would replace the simulated service flows.
 
 Before those features handle real funds, the test components need production equivalents: a source of yield, real liquidity, controlled prediction resolution, stronger Ajo randomness and a CRE workflow deployed on Chainlink's network. Wallet payments, savings rules, allowances, the demo DeFi contracts, guided bills, Guardian and Ajo V2 are already implemented on the testnet path.
 
