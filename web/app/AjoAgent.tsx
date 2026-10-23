@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { AJO_ADDRESS } from "../lib/ajo";
 import { useAjo, refreshAjoNow, getAjoState, fmtDur, type Circle } from "../lib/ajoStore";
 import { fundWallet, moveSome, backupDraw, ajoTarget, type Ctx } from "../lib/ajoActions";
-import { movableOf, type AjoPlan, type AjoStep } from "../lib/ajoIntent";
+import { movableOf, reserveOf, type AjoPlan, type AjoStep } from "../lib/ajoIntent";
 
 export type { AjoPlan, AjoStep };
 export type AjoPending = { steps: AjoStep[]; until: number };
@@ -183,9 +183,9 @@ export default function AjoAgent(props: Props) {
         const free = movableOf(circles, bal);
 
         if (plan.type === "status") {
-          const mine = circles.filter((c) => c.isMember && c.status <= 2);
-          if (mine.length === 0 && free <= 0n) { say({ who: "cowrie", text: "You are not in a running on-chain Ajo right now. Say \"start an ajo\" to begin one." }); return; }
-          for (const c of mine) {
+          const lines: string[] = [];
+          const mineAll = circles.filter((c) => c.isMember);
+          for (const c of mineAll.filter((x) => x.status <= 2)) {
             let line = `"${c.name}": `;
             if (c.status === 0) line += `${c.members.length} of ${c.maxMembers} have joined, waiting for the rest.`;
             else if (c.status === 1) line += `everyone is in, waiting ${fmtDur(nowSec - c.fullAt)} for Chainlink CRE to draw the order.`;
@@ -195,10 +195,22 @@ export default function AjoAgent(props: Props) {
               line += c.paidNow ? "You have paid. " : left > 0 ? `You still need to pay ${fmt(c.contribution)}. ` : "";
               line += c.autopayOn ? "Auto-pay is on. " : "";
               line += left > 0 ? `It ends in ${fmtDur(left)}.` : "Time is up, the payout is on its way.";
+              if (iCollect(c) && left <= 0) line += ` The ${fmt(potOf(c))} pot is yours to collect.`;
             }
-            say({ who: "cowrie", text: line });
+            if (c.myDeposit > 0n) line += ` Your ${fmt(c.myDeposit)} deposit is locked until the circle ends.`;
+            lines.push(line);
           }
-          if (free > 0n) say({ who: "cowrie", text: `${fmt(free)} is waiting in your wallet. Say "move my pot" to put it in spendable.` });
+          const owed = mineAll.filter((c) => c.status >= 3 && c.myDeposit > 0n);
+          for (const c of owed) lines.push(`"${c.name}" is ${c.status === 3 ? "complete" : c.status === 4 ? "cancelled" : "ended early"}. Your ${fmt(c.myDeposit)} deposit is ready to withdraw.`);
+          if (free > 0n) lines.push(`${fmt(free)} is waiting in your wallet, ready to move to spendable.`);
+          const held = reserveOf(circles);
+          if (held > 0n) lines.push(`${fmt(held)} in your wallet is set aside for auto-pay.`);
+          if (lines.length === 0) { say({ who: "cowrie", text: "You have nothing waiting in Ajo: no running circle, no deposit to withdraw and no money in your wallet. Say \"start an ajo\" to begin one." }); return; }
+          const opts: string[] = [];
+          if (owed.length && free > 0n) opts.push("Withdraw my deposit and move it");
+          else if (owed.length) opts.push("Withdraw my deposit");
+          else if (free > 0n) opts.push("Move my pot");
+          say({ who: "cowrie", text: lines.join("\n"), options: opts.length ? opts : undefined });
           return;
         }
 

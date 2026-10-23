@@ -168,6 +168,7 @@ RULES
 - SLANG AND TYPOS: understand typos, abbreviations and slang in English (nvm, idk, tbh, ngl, rn, imo, fr, lowkey, bet, no cap, fire, vibes, bro, bruh, omg, brb, ty, thx, pls, plz, wanna, gonna, gimme), in Nigerian Pidgin (dey, wetin, abeg, oya, sharp sharp, e don do, I dey, na so, make we, how far, you dey play or dey plizzy or you dey joke meaning "you are kidding", often said sarcastically) and in mixed Pidgin and English. Judge the meaning from the whole sentence and the conversation, not from single words, and fix obvious typos silently.
 - UNKNOWN SLANG: when a word or phrase is genuinely unfamiliar, do not say you did not catch it and do not list what you can do. Ask in one short line what it means, and when they explain it, save the meaning with "remember".
 - NEVER CLAIM AN ACTION: you cannot move money. Never say anything is done, sent, paid, moved, withdrawn or collected. The app asks the user to confirm and then shows its own receipt.
+- AJO QUESTIONS: for any question about the user's circles, deposits, pots, withdrawals or wallet money, answer ONLY from the Ajo facts you were given, and mention every relevant item (deposits as well as pots). Never guess. You cannot look anything up, so never say you will check, look or see: answer immediately from those facts, or say plainly that they are not loaded yet.
 - MEMORY: you are given the recent conversation, the user's recent wallet activity and their saved chats. Before saying you have no record of something, check all three. If a payment, Ajo share or send appears there, it happened; say so plainly with the amount and who.
 - HOW COWRIE'S OWN FEATURES WORK, so you explain them correctly and never say a built feature does not exist:
   Ajo (on-chain): an Ajo circle is a real contract on Monad. The creator picks the amount each person pays per round, a security deposit (at least one payment, bigger is safer), the round length and the number of members. Members join from their OWN Cowrie account and lock the deposit, so the creator cannot add people for them. When the circle is full, a Chainlink CRE workflow draws the payout order from the live Chainlink BTC price, so nobody can rig who collects first, and records it on-chain. Each round, everyone pays their share before the timer ends; when it ends, the workflow settles the round and the whole pot goes to that round's collector. A missed payment is taken from the member's deposit so the collector is still paid in full, and the member gets a strike. After the last round everyone withdraws what is left of their deposit. Circles can be invite-only, so only the people the creator names can join. How people join, exactly: there is NO Share button in the chat and no code to type. An open circle shows up in every Cowrie user's Ajo sheet on Home with a Join button. An invite-only circle shows up only for the people the creator invited, and only in their own Cowrie account (the wallet address saved in People must be that account's address); they also get a bell alert when their app is open. The creator of a circle that is still open can tap Share link on the circle's card in the Ajo sheet, which sends a link that opens Cowrie straight to that circle with a Join button. Never invent any other way to join and never say a code exists.
@@ -227,7 +228,7 @@ async function llmParse(text: string, name: string, lang: string, history: { rol
 }
 
 export async function POST(req: NextRequest) {
-  const { text, name, lang, history, facts, subs, bal, markets, contacts, prices, recent, chats } = await req.json().catch(() => ({ text: "" }));
+  const { text, name, lang, history, facts, subs, bal, markets, contacts, prices, recent, chats, ajo } = await req.json().catch(() => ({ text: "" }));
   if (!text || typeof text !== "string") return NextResponse.json({ ok: false, error: "no text" }, { status: 400 });
   const nm = typeof name === "string" && name ? name : "there";
   const lg = typeof lang === "string" && lang ? lang : "Auto";
@@ -237,7 +238,8 @@ export async function POST(req: NextRequest) {
   const px = typeof prices === "string" && prices.trim() ? prices : "";
   const rc = typeof recent === "string" && recent.trim() ? recent.slice(0, 900) : "";
   const ch = typeof chats === "string" && chats.trim() ? chats.slice(0, 500) : "";
-  const ctx = ` The user's CURRENT live balances (authoritative, never contradict these): ${typeof bal === "string" && bal ? bal : "unknown"}. Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}. Their saved People contacts (name: address), the authoritative list, use these when they say a name and tell them to open People to see them: ${bk || "none saved yet"}. LIVE Chainlink prices right now (authoritative, this is real data you DO have): ${px || "not loaded yet"}. The user's RECENT WALLET ACTIVITY, newest first (authoritative record of what was sent, paid and received): ${rc || "nothing yet"}. Titles of their earlier saved chats: ${ch || "none yet"}. The ONLY open prediction markets right now are: ${mkts || "none"}. If the user asks to bet on anything else, do not invent a market: use the predict action and the app will show them these, or tell them it is not available and name these.`;
+  const aj = typeof ajo === "string" && ajo.trim() ? ajo.slice(0, 1400) : "";
+  const ctx = ` The user's CURRENT live balances (authoritative, never contradict these): ${typeof bal === "string" && bal ? bal : "unknown"}. Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}. Their saved People contacts (name: address), the authoritative list, use these when they say a name and tell them to open People to see them: ${bk || "none saved yet"}. LIVE Chainlink prices right now (authoritative, this is real data you DO have): ${px || "not loaded yet"}. The user's RECENT WALLET ACTIVITY, newest first (authoritative record of what was sent, paid and received): ${rc || "nothing yet"}. Titles of their earlier saved chats: ${ch || "none yet"}. The Ajo circles and Ajo money of this user right now, read from the chain a moment ago and authoritative: ${aj || "not loaded yet"}. The ONLY open prediction markets right now are: ${mkts || "none"}. If the user asks to bet on anything else, do not invent a market: use the predict action and the app will show them these, or tell them it is not available and name these.`;
   const llm = await llmParse(text, nm, lg, hist, ctx);
   let intent = llm && (llm as { action?: string }).action ? llm : rulesParse(text, nm);
   // Safety: anything that mentions an Ajo circle must never turn into a payment. Send it to the Ajo form.
@@ -286,6 +288,15 @@ export async function POST(req: NextRequest) {
       && /\b(pot|deposit|withdraw|spendable|ajo|circle|round|payout|share)\b/i.test(m1)) {
       r1.message = `I have not moved anything yet, ${nm}. Say what you want in one line, like "move my pot", "withdraw my deposit" or "pay my share", and I will ask you to confirm before any money moves.`;
       r1.options = ["Move my pot", "Withdraw my deposit", "Pay my share", "Ajo status"];
+    }
+  }
+  {
+    // The AI cannot look anything up. If it promises to "check", answer from the facts it was given instead.
+    const r2 = intent as { action?: string; message?: string; options?: string[] };
+    if (r2.action === "reply" && aj && /\b(let me|i'?ll|i will|give me a (sec|second|moment)|hold on)\b[^.]{0,40}\b(check|look|see|pull|confirm|find)/i.test(String(r2.message || ""))
+      && /\b(aj+o+|circle|pot|deposit|withdraw|payout|round|share|esusu|thrift)\b/i.test(text + " " + String(r2.message || ""))) {
+      r2.message = `Here is where your Ajo stands, ${nm}:\n${aj.split("; ").join("\n")}`;
+      r2.options = ["Move my pot", "Withdraw my deposit", "Ajo status"];
     }
   }
   const io = intent as { message?: string; reply?: string; reason?: string };

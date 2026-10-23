@@ -4,7 +4,7 @@ import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
 import { addresses, vaultAbi, scamAbi, usdAbi } from "../lib/contracts";
-import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { detectBill, billStart, billNext, billReceipt } from "../lib/bills"; import type { BillState, BillSay } from "../lib/bills"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import { parseAjoText } from "../lib/ajoIntent"; import { refreshAjoNow } from "../lib/ajoStore"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
+import { readAllFeeds, feedKeyFor } from "../lib/chainlink"; import OnchainAjo from "./OnchainAjo"; import { detectBill, billStart, billNext, billReceipt } from "../lib/bills"; import type { BillState, BillSay } from "../lib/bills"; import { ajoAbi, AJO_ADDRESS } from "../lib/ajo"; import AjoAgent from "./AjoAgent"; import { parseAjoText, ajoFacts } from "../lib/ajoIntent"; import { refreshAjoNow } from "../lib/ajoStore"; import type { AjoPending, AjoCommand, AjoExec } from "./AjoAgent";
 
 const RATE = Number(process.env.NEXT_PUBLIC_NGN_PER_USD || 1600);
 const CURRENCIES: Record<string, { symbol: string; perUsd: number }> = {
@@ -791,7 +791,7 @@ export default function CowrieApp() {
     }
     {
       // Ajo requests are recognised here, from your live circles, before the AI sees them. The AI explains; the app acts.
-      if (!awaitingName.current && AJO_ADDRESS && /\b(pay|join|withdraw|refund|collect|claim|move|transfer|status|ajo|aj+o+|circle|pot|share|deposit|round|esusu|thrift|payout|winnings?|how'?s|progress|turn)\b/i.test(text)) {
+      if (!awaitingName.current && AJO_ADDRESS && text.length < 200) {
         const plan = parseAjoText(text);
         if (plan) { setInput(""); say({ who: "you", text }); setAjoCmd({ plan, stamp: Date.now() }); return; }
       }
@@ -816,7 +816,7 @@ export default function CowrieApp() {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 25000);
       let it: any;
-      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history: hist8, recent: history.slice(0, 10).map((h) => `${h.title} ${h.sign === "neg" ? "-" : h.sign === "pos" ? "+" : ""}${h.amount} (${agoStr(h.ts)})`).join("; "), chats: sessions.slice(0, 5).map((s) => `"${s.title}" (${agoStr(s.ts)})`).join("; "), facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
+      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history: hist8, recent: history.slice(0, 10).map((h) => `${h.title} ${h.sign === "neg" ? "-" : h.sign === "pos" ? "+" : ""}${h.amount} (${agoStr(h.ts)})`).join("; "), chats: sessions.slice(0, 5).map((s) => `"${s.title}" (${agoStr(s.ts)})`).join("; "), ajo: ajoFacts(cfmt), facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
       finally { clearTimeout(timer); }
       const c = it.currency && it.currency !== "AUTO" && CURRENCIES[it.currency] ? it.currency : ccy;
       const amt = (n: number) => amtStr(n, c);
