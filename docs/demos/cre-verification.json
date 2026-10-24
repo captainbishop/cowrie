@@ -1,0 +1,136 @@
+{
+  "verifiedAt": "2026-10-24T18:55:08.628Z",
+  "chainId": 10143,
+  "circle": 6,
+  "passed": true,
+  "receipts": [
+    {
+      "action": "draw recorded",
+      "hash": "0x2f6ec1fc83ff49192e79796af4615f219ccc657cc3a5006b89ccbd08e3d74d1d",
+      "block": 73880672,
+      "timestamp": 1792865372,
+      "to": "0xB9F79d863261869B234c481D1f9A7af84AeAd192",
+      "status": 1
+    },
+    {
+      "action": "auto-pay pulled",
+      "hash": "0x6584809a866a9cc987cb63e7d8d285642eb0dedf2018a3f18a05605322e8c311",
+      "block": 73881075,
+      "timestamp": 1792865494,
+      "to": "0xB9F79d863261869B234c481D1f9A7af84AeAd192",
+      "status": 1
+    },
+    {
+      "action": "round settled",
+      "hash": "0xad17f60040708fc3335e58f02915fbc8417831a2d67015b62c95fa1d61e6e163",
+      "block": 73884434,
+      "timestamp": 1792866520,
+      "to": "0xB9F79d863261869B234c481D1f9A7af84AeAd192",
+      "status": 1
+    },
+    {
+      "action": "auto-pay pulled",
+      "hash": "0xdfcccc6188850bcbfdd2f3f8a2a639af92e92add69e59c3634b2f61fc9900d7b",
+      "block": 73884859,
+      "timestamp": 1792866649,
+      "to": "0xB9F79d863261869B234c481D1f9A7af84AeAd192",
+      "status": 1
+    },
+    {
+      "action": "round settled",
+      "hash": "0xe52564cb6b8e6571256ad3ff4912d54ae1833e072c4f6315efd1082181c37a68",
+      "block": 73885637,
+      "timestamp": 1792866887,
+      "to": "0xB9F79d863261869B234c481D1f9A7af84AeAd192",
+      "status": 1
+    }
+  ],
+  "events": [
+    {
+      "name": "Drawn",
+      "args": {
+        "id": "6",
+        "by": "1",
+        "seed": "80174277",
+        "order": [
+          "0xCeB37d107780d69dD85DD20A4c2c6C7f1aA5C715",
+          "0x3C5133E74D3bd601D53dB98C277BaEe039Fc0b77"
+        ]
+      },
+      "hash": "0x2f6ec1fc83ff49192e79796af4615f219ccc657cc3a5006b89ccbd08e3d74d1d"
+    },
+    {
+      "name": "Contributed",
+      "args": {
+        "id": "6",
+        "round": "1",
+        "member": "0xCeB37d107780d69dD85DD20A4c2c6C7f1aA5C715",
+        "amount": "1000000"
+      },
+      "hash": "0x6584809a866a9cc987cb63e7d8d285642eb0dedf2018a3f18a05605322e8c311"
+    },
+    {
+      "name": "Contributed",
+      "args": {
+        "id": "6",
+        "round": "1",
+        "member": "0x3C5133E74D3bd601D53dB98C277BaEe039Fc0b77",
+        "amount": "1000000"
+      },
+      "hash": "0x6584809a866a9cc987cb63e7d8d285642eb0dedf2018a3f18a05605322e8c311"
+    },
+    {
+      "name": "RoundSettled",
+      "args": {
+        "id": "6",
+        "round": "1",
+        "collector": "0xCeB37d107780d69dD85DD20A4c2c6C7f1aA5C715",
+        "pot": "2000000"
+      },
+      "hash": "0xad17f60040708fc3335e58f02915fbc8417831a2d67015b62c95fa1d61e6e163"
+    },
+    {
+      "name": "Contributed",
+      "args": {
+        "id": "6",
+        "round": "2",
+        "member": "0xCeB37d107780d69dD85DD20A4c2c6C7f1aA5C715",
+        "amount": "1000000"
+      },
+      "hash": "0xdfcccc6188850bcbfdd2f3f8a2a639af92e92add69e59c3634b2f61fc9900d7b"
+    },
+    {
+      "name": "Contributed",
+      "args": {
+        "id": "6",
+        "round": "2",
+        "member": "0x3C5133E74D3bd601D53dB98C277BaEe039Fc0b77",
+        "amount": "1000000"
+      },
+      "hash": "0xdfcccc6188850bcbfdd2f3f8a2a639af92e92add69e59c3634b2f61fc9900d7b"
+    },
+    {
+      "name": "RoundSettled",
+      "args": {
+        "id": "6",
+        "round": "2",
+        "collector": "0x3C5133E74D3bd601D53dB98C277BaEe039Fc0b77",
+        "pot": "2000000"
+      },
+      "hash": "0xe52564cb6b8e6571256ad3ff4912d54ae1833e072c4f6315efd1082181c37a68"
+    },
+    {
+      "name": "Completed",
+      "args": {
+        "id": "6"
+      },
+      "hash": "0xe52564cb6b8e6571256ad3ff4912d54ae1833e072c4f6315efd1082181c37a68"
+    }
+  ],
+  "finalStatus": "Completed",
+  "browserErrors": [],
+  "interruptedRuns": [
+    "run-03.log"
+  ],
+  "editing": "Interrupted waits are omitted from the edited video; raw frames and logs are retained."
+}

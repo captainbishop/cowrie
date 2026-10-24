@@ -1,0 +1,14 @@
+.card { width:min(100%,640px); align-self:flex-start; flex-shrink:0; border:1px solid var(--border); border-radius:18px; overflow:hidden; background:var(--surface); color:var(--text); }
+.heading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:8px 16px; padding:16px; }
+.heading strong { font-size:16px; }
+.heading span,.footer { font-size:13px; color:var(--dim); }
+.screen { position:relative; background:#111025; }
+.screen video { display:block; width:100%; height:auto; aspect-ratio:16/9; }
+.play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:flex; align-items:center; justify-content:center; gap:8px; min-height:48px; padding:12px 20px; border:1px solid #ffffff80; border-radius:999px; background:#20183e; color:#fff; font:inherit; font-weight:700; white-space:nowrap; cursor:pointer; box-shadow:0 4px 20px #0006; }
+.play:hover { background:#38295e; }
+.play:active { background:#493879; }
+.footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; padding:4px 16px; }
+.footer a,.error a { color:var(--brand-soft-ink); font-weight:700; }
+.footer a { display:inline-flex; align-items:center; min-height:44px; }
+.error { padding:0 16px; font-size:14px; }
+.card a:focus-visible,.play:focus-visible,.screen video:focus-visible { outline:3px solid var(--brand); outline-offset:3px; }

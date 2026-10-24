@@ -293,3 +293,11 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .sheet button.ajochip { background: var(--surface-2); border: 1.5px solid var(--border); color: var(--text); cursor: pointer; border-radius: 999px; }
 .sheet button.ajochip.on { background: linear-gradient(135deg,var(--brand),var(--brand-2)); color: #fff; border-color: transparent; }
 .ajobusy { margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; font-size: 12.5px; background: rgba(124,108,255,.14); color: var(--text); }
+
+/* Demo access stays secondary to entering the wallet. */
+.demoentry { display:inline-flex; align-items:center; gap:12px; min-height:44px; margin-top:16px; color:var(--brand-soft-ink); font-size:15px; font-weight:700; text-decoration:none; border-radius:8px; }
+.demoentry:hover { text-decoration:underline; text-underline-offset:4px; }
+.demoentry:focus-visible,.demoentry-settings:focus-visible { outline:3px solid var(--brand); outline-offset:4px; }
+.demoentry-settings { color:var(--text); text-decoration:none; border-radius:10px; min-height:60px; }
+.demoentry-settings .lab,.demoentry-settings .sub { display:block; }
+.demoentry-settings:hover { background:var(--surface-2); }

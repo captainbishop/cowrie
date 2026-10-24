@@ -17,6 +17,7 @@
 
 <p align="center">
   <a href="https://cowrie-amber.vercel.app">Try Cowrie</a> ·
+  <a href="https://cowrie-amber.vercel.app/demo">Watch the demo</a> ·
   <a href="#what-you-can-do-today">Capabilities</a> ·
   <a href="#architecture">Architecture</a> ·
   <a href="#what-each-integration-does">Integrations</a> ·
@@ -34,6 +35,13 @@ You describe what you want in your own words. The AI uses the conversation and y
 Cowrie is built first for everyday use in Nigeria. It defaults to naira, understands Nigerian Pidgin and supports Igbo, Yoruba and Hausa alongside other languages. Google or email sign-in creates an embedded wallet through Privy, with gas sponsorship requested for transactions.
 
 **The [live app](https://cowrie-amber.vercel.app) runs on Monad testnet with cUSD test money.** Displayed naira amounts use demo conversion rates. Bill payments simulate service delivery, and the savings yield and traded assets are test tokens.
+
+## Watch Cowrie
+
+- [Product tour](web/public/demos/cowrie-product-v1.mp4) — payments, savings and Ajo through conversation.
+- [Ajo and Chainlink CRE](web/public/demos/cowrie-cre-v1.mp4) — a recorded testnet circle, from the draw and automatic contributions to both payouts.
+
+Both videos are available on the app's `/demo` page. The CRE walkthrough uses test cUSD and CRE simulation with broadcast. Its transaction evidence is in [the verification record](docs/demos/cre-verification.json).
 
 ## Why Nigeria first
 
@@ -92,6 +100,7 @@ Ajo's UI and chat share the [same circle snapshot](web/lib/ajoStore.ts). The ind
 |---|---|---|
 | Web interface | Next.js 14, React 18, TypeScript 5, CSS | [web/app/](web/app/), [web/lib/](web/lib/) |
 | Wallet and EVM client | Privy React SDK, viem | [providers.tsx](web/app/providers.tsx), [CowrieApp.tsx](web/app/CowrieApp.tsx) |
+| AI models | Qwen 3.8 27B (`qwen/qwen3.8-27b`) as primary; Gemini Flash Lite (`gemini-flash-lite-latest`) as secondary fallback | [intent API](web/app/api/parse/route.ts), [bill flow API](web/app/api/flow/route.ts) |
 | Server APIs | Next.js route handlers, Privy Node SDK, OpenAI-compatible model endpoints | [web/app/api/](web/app/api/) |
 | Contact storage | Redis REST API with Privy authentication | [store route](web/app/api/store/route.ts) |
 | Smart contracts | Solidity 0.8.28, OpenZeppelin Contracts | [contracts/](contracts/) |
@@ -148,7 +157,15 @@ Privy creates an embedded wallet for users who need one when they sign in with G
 
 ### AI and action handling
 
-The [intent API](web/app/api/parse/route.ts) returns an action and its arguments for the client to handle. It uses conversation context, contacts and wallet state to interpret requests. The model endpoint is configurable through `LLM_*`, with a second provider through `LLM2_*` and a deterministic rules parser for core commands when AI is unavailable. Qwen and Gemini are supported through this provider setup.
+The [intent API](web/app/api/parse/route.ts) returns an action and its arguments for the client to handle. It uses conversation context, contacts and wallet state to interpret requests. The current model configuration uses **Qwen 3.8 27B** (`qwen/qwen3.8-27b`) first, through `LLM_*`. If the primary does not return a usable response, the intent route tries **Gemini Flash Lite** (`gemini-flash-lite-latest`) through `LLM2_*`, preserving the same conversation context. The bill flow route also tries the primary before the secondary. If neither provider supplies a usable intent, the general parser uses deterministic rules for core commands; bill replies return to the local flow engine. These model IDs are configurable deployment settings, not hard-coded credentials.
+
+```text
+User message + conversation and wallet context
+  -> Qwen 3.8 27B (primary)
+  -> Gemini Flash Lite (fallback when the primary cannot answer)
+  -> deterministic core-command / bill-flow handling if AI is unavailable
+  -> review and wallet confirmation before a transaction
+```
 
 The [Ajo intent layer](web/lib/ajoIntent.ts) resolves circle commands against current state before the general parser. The [Ajo agent](web/app/AjoAgent.tsx) builds confirmation plans and reports transaction results. Bill replies pass through their own state machine, so changing a network or meter detail does not require starting the whole payment again. Money movement is handled by the transaction executor, and confirmation text is tied to its result.
 

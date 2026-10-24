@@ -1,0 +1,38 @@
+[
+  {
+    "title": "Introducing Cowrie",
+    "text": "Hi, I'm Johnson, and this is Cowrie. I built Cowrie to put everyday finance and the crypto stack behind a simple conversation. You say exactly what you want to do with your money, and Monad settles the transaction."
+  },
+  {
+    "title": "Starting in Nigeria",
+    "text": "I'm starting in Nigeria first, where naira and Pidgin can make Cowrie useful from day one, where real use and feedback can ultimately help how I shape and scale this app."
+  },
+  {
+    "title": "Language settings",
+    "text": "With language set to auto, Cowrie can follow how you prompt it and follow your conversations more precisely."
+  },
+  {
+    "title": "Payments and conversation",
+    "text": "I've signed in and funded this wallet with test money. I can tell it, hey Cowrie, I owe Mum five thousand naira for lunch, and it uses my saved contact if Mum is saved, and then I can easily approve the payment. In between prompt, I can decide to switch to Pidgin if I'm more comfortable with Pidgin, and Cowrie still explains and understands my prompt."
+  },
+  {
+    "title": "Earn",
+    "text": "Earn helps you move your spendables into Cowrie's savings vault where it earns you 10% a year based on what you stake in it. Say Pidgin for example, something like Oya put twenty thousand naira in Earn and Cowrie understands that intent and carries it as action for you. After confirmation, there you can observe the status of your Earn."
+  },
+  {
+    "title": "Airtime",
+    "text": "You could use it to run an airtime payment, even if you've realized during the airtime payment that you have chosen the wrong network, you could tell it exactly that, and it could update that before it sends you an approval card where you click and approve yourself."
+  },
+  {
+    "title": "Ajo circles",
+    "text": "You could set up a savings circle, you could choose the contribution, and you could invite your friends that are already in your saved contact and members can join from their own wallet. Monad Contract holds the contribution, while Chainlink CRE coordinates the draw and schedules the payout."
+  },
+  {
+    "title": "On-chain receipts",
+    "text": "You could go into the payment section, review your activity history, and get receipt for each transaction The Earn deposit on the other hand is confirmed it has a transaction hash that it can be verified on chain."
+  },
+  {
+    "title": "What comes next",
+    "text": "In the future, Cowrie is going to move beyond being a conversational layer for finance in real life to becoming a conversational AI behind the entire crypto stack."
+  }
+]

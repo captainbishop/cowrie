@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 30;
 
 type Intent =
+  | { action: "watchDemo" }
   | { action: "setAutosave"; percent: number }
   | { action: "setDailyCap"; amount: number; currency: string }
   | { action: "setAllowance"; to: string; amount: number; currency: string }
@@ -132,6 +133,7 @@ Output ONLY one JSON object, no markdown:
 {"action":"unlockSavings","amount":n,"currency":C}
 {"action":"addSubscription","service":s,"amount":n,"currency":C,"cycleDays":n,"startedDaysAgo":n}
 {"action":"addReminder","title":s,"amount":n,"currency":C,"dueInDays":n,"repeatDays":n}
+{"action":"watchDemo"}
 {"action":"balance"}
 {"action":"price","asset":"bitcoin"|"ethereum"}
 {"action":"earn","amount":n,"currency":C}
@@ -170,6 +172,8 @@ RULES
 - NEVER CLAIM AN ACTION: you cannot move money. Never say anything is done, sent, paid, moved, withdrawn or collected. The app asks the user to confirm and then shows its own receipt.
 - AJO QUESTIONS: for any question about the user's circles, deposits, pots, withdrawals or wallet money, answer ONLY from the Ajo facts you were given, and mention every relevant item (deposits as well as pots). Never guess. You cannot look anything up, so never say you will check, look or see: answer immediately from those facts, or say plainly that they are not loaded yet.
 - MEMORY: you are given the recent conversation, the user's recent wallet activity and their saved chats. Before saying you have no record of something, check all three. If a payment, Ajo share or send appears there, it happened; say so plainly with the amount and who.
+- WATCHING THE DEMO: infer the user's intended outcome from the complete current message and the relevant recent conversation. Return watchDemo when they want to see Cowrie demonstrated visually, watch its product video, or view a walkthrough. The wording and language are unrestricted; no command or special phrase is required. The app will embed the video in the conversation. Questions asking for an explanation can be answered normally.
+- AMBIGUITY AND CONTEXT: a bare affirmation such as "yes please" is not itself a demo request. Use the most recent relevant question to resolve what is being confirmed. Only return watchDemo for an affirmation when watching Cowrie's demo is the single clear offer being accepted. If context is absent, has multiple possible offers, has changed topic, or the user is refusing the video, do not open it. Ask one short clarification when needed. Mentioning the word demo or video in a payment, recipient name or unrelated request is not a request to watch anything. Never treat quoted examples as actions to execute.
 - HOW COWRIE'S OWN FEATURES WORK, so you explain them correctly and never say a built feature does not exist:
   Ajo (on-chain): an Ajo circle is a real contract on Monad. The creator picks the amount each person pays per round, a security deposit (at least one payment, bigger is safer), the round length and the number of members. Members join from their OWN Cowrie account and lock the deposit, so the creator cannot add people for them. When the circle is full, a Chainlink CRE workflow draws the payout order from the live Chainlink BTC price, so nobody can rig who collects first, and records it on-chain. Each round, everyone pays their share before the timer ends; when it ends, the workflow settles the round and the whole pot goes to that round's collector. A missed payment is taken from the member's deposit so the collector is still paid in full, and the member gets a strike. After the last round everyone withdraws what is left of their deposit. Circles can be invite-only, so only the people the creator names can join. How people join, exactly: there is NO Share button in the chat and no code to type. An open circle shows up in every Cowrie user's Ajo sheet on Home with a Join button. An invite-only circle shows up only for the people the creator invited, and only in their own Cowrie account (the wallet address saved in People must be that account's address); they also get a bell alert when their app is open. The creator of a circle that is still open can tap Share link on the circle's card in the Ajo sheet, which sends a link that opens Cowrie straight to that circle with a Join button. Never invent any other way to join and never say a code exists.
   Starting a circle is done in the Ajo sheet on Home (the "ajo" action opens it with the details filled in). Paying a share, joining a circle, withdrawing a deposit, moving winnings to spendable and checking progress are done right in the chat with the "ajoDo" action ("what" is pay, join, withdraw, move or status, and "name" is the circle name if given). The app asks the user to confirm before any money moves, so never say it has already happened. Examples of what users say for ajoDo (understand any similar wording, in any language, including Pidgin): "pay my ajo", "I want to pay my own for this round", "did I pay yet", "whose turn is it to collect", "how is my ajo going", "join Office Thrift", "withdraw my deposit", "move my ajo money to spendable", "wetin dey happen with my ajo", "abeg make I pay my ajo". If you are not sure what they want to do with their ajo, ask one short question instead of guessing. Do not ask for cycle days or a list of members, and do not say you will set the circle up from the chat. If they give a round length (5 min, 2 hours, daily, weekly), put it in "minutes" (an hour is 60, a day is 1440, a week is 10080, a month is 43200) and never invent one.
@@ -228,7 +232,7 @@ async function llmParse(text: string, name: string, lang: string, history: { rol
 }
 
 export async function POST(req: NextRequest) {
-  const { text, name, lang, history, facts, subs, bal, markets, contacts, prices, recent, chats, ajo } = await req.json().catch(() => ({ text: "" }));
+  const { text, name, lang, history, facts, subs, bal, markets, contacts, prices, recent, chats, ajo, awaitingName } = await req.json().catch(() => ({ text: "" }));
   if (!text || typeof text !== "string") return NextResponse.json({ ok: false, error: "no text" }, { status: 400 });
   const nm = typeof name === "string" && name ? name : "there";
   const lg = typeof lang === "string" && lang ? lang : "Auto";
@@ -239,9 +243,17 @@ export async function POST(req: NextRequest) {
   const rc = typeof recent === "string" && recent.trim() ? recent.slice(0, 900) : "";
   const ch = typeof chats === "string" && chats.trim() ? chats.slice(0, 500) : "";
   const aj = typeof ajo === "string" && ajo.trim() ? ajo.slice(0, 1400) : "";
-  const ctx = ` The user's CURRENT live balances (authoritative, never contradict these): ${typeof bal === "string" && bal ? bal : "unknown"}. Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}. Their saved People contacts (name: address), the authoritative list, use these when they say a name and tell them to open People to see them: ${bk || "none saved yet"}. LIVE Chainlink prices right now (authoritative, this is real data you DO have): ${px || "not loaded yet"}. The user's RECENT WALLET ACTIVITY, newest first (authoritative record of what was sent, paid and received): ${rc || "nothing yet"}. Titles of their earlier saved chats: ${ch || "none yet"}. The Ajo circles and Ajo money of this user right now, read from the chain a moment ago and authoritative: ${aj || "not loaded yet"}. The ONLY open prediction markets right now are: ${mkts || "none"}. If the user asks to bet on anything else, do not invent a market: use the predict action and the app will show them these, or tell them it is not available and name these.`;
+  const ctx = ` ${awaitingName === true ? "The app has asked for a preferred name. If the user actually supplies a name, return setName. If they ask for an action or information instead, handle that request normally; never store the request as their name." : ""} The user's CURRENT live balances (authoritative, never contradict these): ${typeof bal === "string" && bal ? bal : "unknown"}. Saved facts about the user: ${Array.isArray(facts) && facts.length ? facts.join("; ") : "none yet"}. Their subscriptions: ${typeof subs === "string" && subs ? subs : "none yet"}. Their saved People contacts (name: address), the authoritative list, use these when they say a name and tell them to open People to see them: ${bk || "none saved yet"}. LIVE Chainlink prices right now (authoritative, this is real data you DO have): ${px || "not loaded yet"}. The user's RECENT WALLET ACTIVITY, newest first (authoritative record of what was sent, paid and received): ${rc || "nothing yet"}. Titles of their earlier saved chats: ${ch || "none yet"}. The Ajo circles and Ajo money of this user right now, read from the chain a moment ago and authoritative: ${aj || "not loaded yet"}. The ONLY open prediction markets right now are: ${mkts || "none"}. If the user asks to bet on anything else, do not invent a market: use the predict action and the app will show them these, or tell them it is not available and name these.`;
   const llm = await llmParse(text, nm, lg, hist, ctx);
   let intent = llm && (llm as { action?: string }).action ? llm : rulesParse(text, nm);
+  // An affirmation cannot choose between alternatives, even if the model picks one.
+  if ((intent as { action?: string }).action === "watchDemo"
+    && /^\s*(yes|yeah|yep|yup|sure|ok|okay|please|go ahead|do it|absolutely|of course)(\s+(please|thanks|thank you))?[.!\s]*$/i.test(text)) {
+    const lastOffer = [...hist].reverse().find((m) => m.role === "assistant");
+    if (!lastOffer || /\bor\b|\beither\b|\bwhich\b/i.test(lastOffer.content)) {
+      intent = { action: "reply", message: "Would you like to watch the Cowrie demo, or did you mean something else?", options: ["Watch the demo", "Something else"] };
+    }
+  }
   // Safety: anything that mentions an Ajo circle must never turn into a payment. Send it to the Ajo form.
   if (/\b(ajo|esusu|susu|adashe|thrift|savings? circle|rotating savings)\b/i.test(text) && !["ajoDo", "reply"].includes((intent as { action?: string }).action || "")) {
     const t0 = text.toLowerCase();

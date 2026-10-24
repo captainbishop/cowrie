@@ -128,6 +128,14 @@ bash scripts/cre-runner.sh
 
 This script repeatedly broadcasts non-interactive simulations and waits three seconds after each run. It uses trigger index `0` and skips CLI type checking, so run `bun run typecheck` in `my-workflow/` first. Stop it with `Ctrl+C`. Its loop frequency is separate from the workflow's one-minute cron configuration, and it only keeps working while the process is running.
 
+For a recorded demonstration, use [recording-runner.sh](scripts/recording-runner.sh) from this directory after type checking:
+
+```sh
+bash scripts/recording-runner.sh /absolute/path/to/demo/evidence
+```
+
+It saves each complete CLI invocation in a separate `run-NN.log`, streams progress to `runner.log`, and stops when an invocation fails, reports an RPC health warning, or skips a circle because of an error. Restarting preserves the earlier logs. Create `stop.flag` in the evidence directory's parent to finish after the current invocation, or use `CRE_RUN_ONCE=1` for one invocation. These runs broadcast real Monad testnet transactions. Resolve any connection problem and inspect the prior transaction result before restarting.
+
 ## Moving beyond simulation
 
 A deployed service needs workflow registration on Chainlink's network, the correct network forwarder, keeper workflow-ID configuration and operational monitoring. The scan currently covers only 30 circles, and the demo draw uses a price as its seed. Both need revisiting for broader use. The owner's `setForwarder` and workflow-ID settings support updating the receiver configuration, but changing those values alone does not deploy a workflow.

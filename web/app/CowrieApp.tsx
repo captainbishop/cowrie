@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import DemoVideo from "./DemoVideo";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
@@ -78,7 +79,7 @@ const CHIP_POOL = ["Send ₦5,000 to a friend", "Save 10% of what I receive", "G
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
 const EXPLORER = monadTestnet.blockExplorers?.default.url || "https://testnet.monadexplorer.com";
 
-type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[]; links?: DApp[] };
+type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[]; links?: DApp[]; demo?: boolean };
 type Tx = { hash: string; title: string; amount: string; sign: "pos" | "neg" | ""; ts: number };
 const SENT_EVENT = parseAbiItem("event Sent(address indexed from, address indexed to, uint256 amount, uint256 autoSaved)");
 type Sub = { id: string; service: string; amount: number; currency: string; cycleDays: number; startISO: string; nextISO: string };
@@ -138,7 +139,7 @@ export default function CowrieApp() {
   const [ajos, setAjos] = useState<{ id: string; name: string; amount: number; currency: string; members: { name: string; address?: string }[]; order: number[]; seedPrice: number; round: number; cycleDays?: number; nextISO?: string; pinged?: number }[]>([]);
   const [homePanel, setHomePanel] = useState<"guardian" | "ajo" | null>(null);
   const [nickname, setNickname] = useState("");
-  const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string }[] }[]>([]);
+  const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string; demo?: boolean }[] }[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null>(null);
   const [ajoCmd, setAjoCmd] = useState<AjoCommand | null>(null);
@@ -281,7 +282,7 @@ export default function CowrieApp() {
     const t = setTimeout(() => {
       setSessions((prev) => {
         const title = (thread.find((m) => m.who === "you")?.text || "Conversation").slice(0, 52);
-        const s = { id: curSid.current, title, ts: Date.now(), msgs: thread.slice(-80).map(({ who, text, tone }) => ({ who, text, tone })) };
+        const s = { id: curSid.current, title, ts: Date.now(), msgs: thread.slice(-80).map(({ who, text, tone, demo }) => ({ who, text, tone, ...(demo ? { demo: true } : {}) })) };
         const next = [s, ...prev.filter((x) => x.id !== s.id)].slice(0, 30);
         persist("cowrie.sessions." + addr, JSON.stringify(next));
         return next;
@@ -796,31 +797,17 @@ export default function CowrieApp() {
         if (plan) { setInput(""); say({ who: "you", text }); setAjoCmd({ plan, stamp: Date.now() }); return; }
       }
     }
-    if (awaitingName.current) {
-      if (/\d|0x/i.test(text) || text.split(/\s+/).length > 6) awaitingName.current = false;
-      else {
-        setInput(""); say({ who: "you", text });
-        const nameWords = text.replace(/[^A-Za-z\u00C0-\u024F0-9 '.-]/g, " ").trim().split(/\s+/).filter(Boolean);
-        const lead = /^(ok|okay|hi|hello|hey|so|well|please|pls|call|cal|cam|me|my|name|is|am|i|i'm|im|it's|its|you|can|may|abeg|just|people|they|the|a|as)$/i;
-        const core = nameWords.filter((w) => !lead.test(w));
-        const given = (core.length ? core.slice(0, 2) : nameWords.slice(-1)).join(" ").slice(0, 24);
-        if (!given) { say({ who: "cowrie", text: "What should I call you? A first name or a nickname is fine." }); return; }
-        const chosen = given[0].toUpperCase() + given.slice(1);
-        awaitingName.current = false; setNick(chosen);
-        say({ who: "cowrie", tone: "good", text: `Nice to meet you, ${chosen}. I'll call you that from now on. What would you like to do with your money?` });
-        return;
-      }
-    }
     setInput(""); const hist8 = thread.slice(-8).map((mm) => ({ role: mm.who === "you" ? "user" : "assistant", content: mm.text })); say({ who: "you", text }); setExpanded(false); const b = detectBrand(text); if (b) setBrand(b); setBusy(true);
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 25000);
       let it: any;
-      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, lang, history: hist8, recent: history.slice(0, 10).map((h) => `${h.title} ${h.sign === "neg" ? "-" : h.sign === "pos" ? "+" : ""}${h.amount} (${agoStr(h.ts)})`).join("; "), chats: sessions.slice(0, 5).map((s) => `"${s.title}" (${agoStr(s.ts)})`).join("; "), ajo: ajoFacts(cfmt), facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
+      try { const res = await fetch("/api/parse", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, name: firstName, awaitingName: awaitingName.current, lang, history: hist8, recent: history.slice(0, 10).map((h) => `${h.title} ${h.sign === "neg" ? "-" : h.sign === "pos" ? "+" : ""}${h.amount} (${agoStr(h.ts)})`).join("; "), chats: sessions.slice(0, 5).map((s) => `"${s.title}" (${agoStr(s.ts)})`).join("; "), ajo: ajoFacts(cfmt), facts, bal: `spendable ${cfmt(spendable)} (about $${conv(spendable, "USD").toFixed(2)}), savings ${cfmt(savings)}, gas ${Number(formatEther(gas)).toFixed(3)} MON`, subs: subs.map((s) => `${s.service} ${amtStr(s.amount, s.currency)} every ${s.cycleDays}d, renews ${new Date(s.nextISO).toDateString()}`).join("; "), markets: markets.filter((m) => !m.resolved).map((m) => m.question).join(" | "), contacts: book.map((b) => `${b.name}: ${b.address}`).join("; "), prices: Object.entries(clPrices).map(([k, v]) => `${k} $${Math.round(v.price).toLocaleString()}`).join(", ") }), signal: ctrl.signal }); it = (await res.json()).intent; }
       finally { clearTimeout(timer); }
       const c = it.currency && it.currency !== "AUTO" && CURRENCIES[it.currency] ? it.currency : ccy;
       const amt = (n: number) => amtStr(n, c);
-      if (it.action === "reply") { if (it.remember) remember(it.remember); say({ who: "cowrie", text: it.message || it.text || it.reply || "Okay.", options: Array.isArray(it.options) ? it.options.slice(0, 4) : undefined }); }
+      if (it.action === "watchDemo") { say({ who: "cowrie", text: "Here’s the Cowrie walkthrough. Tap Play to watch right here.", demo: true }); }
+      else if (it.action === "reply") { if (it.remember) remember(it.remember); say({ who: "cowrie", text: it.message || it.text || it.reply || "Okay.", options: Array.isArray(it.options) ? it.options.slice(0, 4) : undefined }); }
       else if (it.action === "discover") { say({ who: "cowrie", text: `It all lives right here in Cowrie, ${firstName}, no leaving the app. You can grow money in the Earn vault, swap into cBTC, cETH or cGOLD, send, or pay a bill. What would you like to do?` }); }
       else if (it.action === "earn") { const units = toUnits(it.amount || 0, c); if (!it.amount || units <= 0n) { say({ who: "cowrie", text: `How much would you like to move into earning, ${firstName}?`, options: ["Earn ₦10,000", "Earn ₦50,000", "Earn ₦100,000", "Another amount"] }); } else if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} spendable right now, ${firstName}. Pick an amount up to that and I'll move it into your Earn vault.` }); } else { const h = await run("startEarning", [units], { description: `Move ${amt(it.amount)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. ${amt(it.amount)} is in your Cowrie Earn vault now, growing at 10% a year. Pull it out anytime under Activity, or just tell me.` }); } }
       else if (it.action === "stopEarn") { if (earned <= 0n) { say({ who: "cowrie", text: `There's nothing in your Earn vault right now, ${firstName}.` }); } else if (it.amount && Number(it.amount) > 0) { await withdrawEarn((Number(it.amount) / (CURRENCIES[c] || CURRENCIES.NGN).perUsd) * (CURRENCIES[ccy] || CURRENCIES.NGN).perUsd); } else { await withdrawEarnings(); } }
@@ -876,7 +863,7 @@ export default function CowrieApp() {
       else if (it.action === "setName") {
         const raw = (it.name || "").toString().trim().slice(0, 24);
         if (!raw) say({ who: "cowrie", text: "No problem, what should I call you?" });
-        else { const nm = raw[0].toUpperCase() + raw.slice(1); setNick(nm); say({ who: "cowrie", tone: "good", text: `Got it, I'll call you ${nm} from now on. You can change that any time in Settings.` }); }
+        else { const nm = raw[0].toUpperCase() + raw.slice(1); awaitingName.current = false; setNick(nm); say({ who: "cowrie", tone: "good", text: `Got it, I'll call you ${nm} from now on. You can change that any time in Settings.` }); }
       }
       else if (it.action === "guardian") {
         const key = feedKeyFor(it.asset || "");
@@ -946,6 +933,7 @@ export default function CowrieApp() {
           <h1 className="pitch">Talk to your money.</h1>
           <p className="blurb">Send, save, and stay safe, in plain language. Settled on Monad in under a second.</p>
           <button className="cta" onClick={login}>Get started</button>
+          <a className="demoentry" href="/demo">Watch the demo <span aria-hidden="true">↗</span></a>
         </section>
       </div></div>
     );
@@ -1053,6 +1041,7 @@ export default function CowrieApp() {
               {thread.map((m, i) => (
                 <div key={i} style={{ display: "contents" }}>
                   <div className={`bubble ${m.who}${m.tone ? " " + m.tone : ""}`}>{m.text}</div>
+                  {m.who === "cowrie" && m.demo && <DemoVideo />}
                   {m.who === "cowrie" && m.options && m.options.length > 0 && (<div className="quickrow">{m.options.map((o) => (<button key={o} className="quick" onClick={() => handle(o)} disabled={busy}>{o}</button>))}</div>)}
                 </div>
               ))}
@@ -1227,6 +1216,7 @@ export default function CowrieApp() {
               <button className="iconbtn" onClick={copyAddr} aria-label="Copy address"><Icon size={16}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h8" /></Icon></button>
             </div>
             <div className="srow"><div><div className="lab">What Cowrie remembers</div><div className="sub">{facts.length ? `${facts.length} note${facts.length === 1 ? "" : "s"}, ${facts.slice(-2).join("; ")}` : "nothing yet"}</div></div>{facts.length > 0 && (<button className="mini ghost" onClick={() => { setFacts([]); if (addr) persist("cowrie.facts." + addr, "[]"); }}>Clear</button>)}</div>
+            <a className="srow demoentry-settings" href="/demo"><span><span className="lab">Watch the demo</span><span className="sub">See Cowrie in action</span></span><span aria-hidden="true">↗</span></a>
             <button className="linkbtn" onClick={logout}>Sign out</button>
           </div>
         )}

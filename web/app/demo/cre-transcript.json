@@ -1,0 +1,8 @@
+[
+  {"title":"Both wallets join","text":"Wallet A and Wallet B join circle #6 on Monad testnet. Each locks a 2 cUSD deposit and enables auto-pay. The circle has two rounds, with a 1 cUSD contribution per member in each round."},
+  {"title":"CRE draws the payout order","text":"The CRE workflow reads the Chainlink BTC/USD feed and records the payout order: Wallet A first, Wallet B second. The Cowrie app and the terminal show the same result."},
+  {"title":"Round one contributions","text":"CRE pulls 1 cUSD from each opted-in member. Cowrie confirms the contribution, and the terminal records the transaction hash."},
+  {"title":"Round one payout","text":"After the round timer ends, CRE settles the round. Wallet A receives the 2 cUSD pot, and the circle advances to round two."},
+  {"title":"Round two contributions and payout","text":"CRE collects the next 1 cUSD contribution from both members. When the second timer ends, Wallet B receives 2 cUSD. Cowrie marks the circle complete."},
+  {"title":"Every round. Paid out.","text":"Two rounds paid out, four contributions collected, and five verified CRE transactions. Recorded with test cUSD on Monad testnet using CRE simulation with broadcast."}
+]
