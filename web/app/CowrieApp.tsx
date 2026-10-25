@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import DemoVideo from "./DemoVideo";
+import { ThemeSwitch } from "./ThemeProvider";
 import { usePrivy, useWallets, useSendTransaction } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, http, custom, formatUnits, formatEther, encodeFunctionData, parseAbiItem } from "viem";
 import { monadTestnet } from "../lib/chain";
@@ -79,7 +80,7 @@ const CHIP_POOL = ["Send ₦5,000 to a friend", "Save 10% of what I receive", "G
 const publicClient = createPublicClient({ chain: monadTestnet, transport: http() });
 const EXPLORER = monadTestnet.blockExplorers?.default.url || "https://testnet.monadexplorer.com";
 
-type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[]; links?: DApp[]; demo?: boolean };
+type Msg = { who: "you" | "cowrie"; tone?: "good" | "bad"; text: string; options?: string[]; links?: DApp[]; demo?: boolean | "product" | "cre" };
 type Tx = { hash: string; title: string; amount: string; sign: "pos" | "neg" | ""; ts: number };
 const SENT_EVENT = parseAbiItem("event Sent(address indexed from, address indexed to, uint256 amount, uint256 autoSaved)");
 type Sub = { id: string; service: string; amount: number; currency: string; cycleDays: number; startISO: string; nextISO: string };
@@ -114,7 +115,6 @@ export default function CowrieApp() {
   const [toast, setToast] = useState("");
   const [ccy, setCcy] = useState("NGN");
   const [hidden, setHidden] = useState(false);
-  const [theme, setTheme] = useState("system");
   const [lang, setLang] = useState("Auto");
   const [brand, setBrand] = useState<{ label: string; color: string } | null>(null);
   const [celebrate, setCelebrate] = useState(false);
@@ -139,7 +139,7 @@ export default function CowrieApp() {
   const [ajos, setAjos] = useState<{ id: string; name: string; amount: number; currency: string; members: { name: string; address?: string }[]; order: number[]; seedPrice: number; round: number; cycleDays?: number; nextISO?: string; pinged?: number }[]>([]);
   const [homePanel, setHomePanel] = useState<"guardian" | "ajo" | null>(null);
   const [nickname, setNickname] = useState("");
-  const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string; demo?: boolean }[] }[]>([]);
+  const [sessions, setSessions] = useState<{ id: string; title: string; ts: number; msgs: { who: string; text: string; tone?: string; demo?: boolean | "product" | "cre" }[] }[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [ajoPrefill, setAjoPrefill] = useState<{ name?: string; amount?: number; minutes?: number; invitees?: string[]; stamp: number } | null>(null);
   const [ajoCmd, setAjoCmd] = useState<AjoCommand | null>(null);
@@ -282,7 +282,7 @@ export default function CowrieApp() {
     const t = setTimeout(() => {
       setSessions((prev) => {
         const title = (thread.find((m) => m.who === "you")?.text || "Conversation").slice(0, 52);
-        const s = { id: curSid.current, title, ts: Date.now(), msgs: thread.slice(-80).map(({ who, text, tone, demo }) => ({ who, text, tone, ...(demo ? { demo: true } : {}) })) };
+        const s = { id: curSid.current, title, ts: Date.now(), msgs: thread.slice(-80).map(({ who, text, tone, demo }) => ({ who, text, tone, ...(demo ? { demo } : {}) })) };
         const next = [s, ...prev.filter((x) => x.id !== s.id)].slice(0, 30);
         persist("cowrie.sessions." + addr, JSON.stringify(next));
         return next;
@@ -377,7 +377,7 @@ export default function CowrieApp() {
     const tod = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : "Good evening";
     setThread((t) => [...t, { who: "cowrie", text: `${tod}. Before we start, what should I call you? A first name or a nickname is fine, and you can change it any time in Settings.` }]);
   }, [authenticated, addr, configured]);
-  useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const th = localStorage.getItem("cowrie.theme"); if (th) setTheme(th); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
+  useEffect(() => { const s = localStorage.getItem("cowrie.ccy"); if (s && CURRENCIES[s]) setCcy(s); setHidden(localStorage.getItem("cowrie.hidden") === "1"); const lg = localStorage.getItem("cowrie.lang"); if (lg) setLang(lg); }, []);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.tx." + addr); setHistory(s ? JSON.parse(s) : []); } catch {} }, [addr]);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.book." + addr); setBook(s ? JSON.parse(s) : []); } catch {} }, [addr]);
   useEffect(() => { if (!addr) return; try { const s = localStorage.getItem("cowrie.subs." + addr); setSubs(s ? JSON.parse(s) : []); const fArr = JSON.parse(localStorage.getItem("cowrie.facts." + addr) || "[]"); setFacts(fArr); const r = localStorage.getItem("cowrie.req." + addr); setRequests(r ? JSON.parse(r) : []);
@@ -390,12 +390,6 @@ export default function CowrieApp() {
       for (const fact of (Array.isArray(fArr) ? fArr : [])) { const m = String(fact).match(/([A-Za-z][A-Za-z0-9 ._-]{0,24}?)(?:'s)?\s*(?:=|:|is|address|wallet|at)\s*.{0,14}?(0x[a-fA-F0-9]{40})/i); if (m && !have.has(m[2].toLowerCase())) { const nm = m[1].trim().replace(/\b(my|the|a|contact|wallet|address|save|add|as|is)\b/gi, "").trim(); if (nm) { bk.push({ name: nm[0].toUpperCase() + nm.slice(1), address: m[2] }); have.add(m[2].toLowerCase()); changed = true; } } }
       if (changed) { persist("cowrie.book." + addr, JSON.stringify(bk)); setBook(bk); }
     } catch {} }, [addr]);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => { const eff = theme === "system" ? (mq.matches ? "dark" : "light") : theme; document.documentElement.dataset.theme = eff; };
-    apply(); mq.addEventListener?.("change", apply);
-    return () => mq.removeEventListener?.("change", apply);
-  }, [theme]);
   const persist = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} };
 
   // Show the last known portfolio instantly, then let the fresh reads replace it.
@@ -465,7 +459,6 @@ export default function CowrieApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book]);
   const changeCcy = (c: string) => { setCcy(c); persist("cowrie.ccy", c); };
-  const changeTheme = (t: string) => { setTheme(t); persist("cowrie.theme", t); };
   const changeLang = (l: string) => { setLang(l); persist("cowrie.lang", l); };
   const toggleHidden = () => setHidden((h) => { persist("cowrie.hidden", h ? "0" : "1"); return !h; });
   const copyAddr = async () => { if (addr) { await navigator.clipboard.writeText(addr); flash("Address copied"); } };
@@ -806,7 +799,7 @@ export default function CowrieApp() {
       finally { clearTimeout(timer); }
       const c = it.currency && it.currency !== "AUTO" && CURRENCIES[it.currency] ? it.currency : ccy;
       const amt = (n: number) => amtStr(n, c);
-      if (it.action === "watchDemo") { say({ who: "cowrie", text: "Here’s the Cowrie walkthrough. Tap Play to watch right here.", demo: true }); }
+      if (it.action === "watchDemo") { say({ who: "cowrie", text: typeof it.message === "string" && it.message.trim() ? it.message : "Take a look at Cowrie in action. Press play whenever you’re ready.", demo: it.variant === "cre" ? "cre" : "product" }); }
       else if (it.action === "reply") { if (it.remember) remember(it.remember); say({ who: "cowrie", text: it.message || it.text || it.reply || "Okay.", options: Array.isArray(it.options) ? it.options.slice(0, 4) : undefined }); }
       else if (it.action === "discover") { say({ who: "cowrie", text: `It all lives right here in Cowrie, ${firstName}, no leaving the app. You can grow money in the Earn vault, swap into cBTC, cETH or cGOLD, send, or pay a bill. What would you like to do?` }); }
       else if (it.action === "earn") { const units = toUnits(it.amount || 0, c); if (!it.amount || units <= 0n) { say({ who: "cowrie", text: `How much would you like to move into earning, ${firstName}?`, options: ["Earn ₦10,000", "Earn ₦50,000", "Earn ₦100,000", "Another amount"] }); } else if (units > spendable) { say({ who: "cowrie", tone: "bad", text: `You've got ${cfmt(spendable)} spendable right now, ${firstName}. Pick an amount up to that and I'll move it into your Earn vault.` }); } else { const h = await run("startEarning", [units], { description: `Move ${amt(it.amount)} into your Earn vault at 10% a year.`, successHeader: "Now earning", title: "Earn" }); logTx({ hash: h, title: "Started earning", amount: amt(it.amount), sign: "" }); say({ who: "cowrie", tone: "good", text: `Done, ${firstName}. ${amt(it.amount)} is in your Cowrie Earn vault now, growing at 10% a year. Pull it out anytime under Activity, or just tell me.` }); } }
@@ -1040,8 +1033,9 @@ export default function CowrieApp() {
               {thread.length === 0 && <p className="empty">Tell Cowrie what to do, in your own words. Try &ldquo;save 10% of everything I receive&rdquo;.</p>}
               {thread.map((m, i) => (
                 <div key={i} style={{ display: "contents" }}>
-                  <div className={`bubble ${m.who}${m.tone ? " " + m.tone : ""}`}>{m.text}</div>
-                  {m.who === "cowrie" && m.demo && <DemoVideo />}
+                  {m.who === "cowrie" && m.demo
+                    ? <DemoVideo variant={m.demo === "cre" ? "cre" : "product"} intro={m.text} />
+                    : <div className={`bubble ${m.who}${m.tone ? " " + m.tone : ""}`}>{m.text}</div>}
                   {m.who === "cowrie" && m.options && m.options.length > 0 && (<div className="quickrow">{m.options.map((o) => (<button key={o} className="quick" onClick={() => handle(o)} disabled={busy}>{o}</button>))}</div>)}
                 </div>
               ))}
@@ -1202,7 +1196,7 @@ export default function CowrieApp() {
               <input className="nickin" value={nickname} placeholder={firstName} onChange={(e) => setNick(e.target.value.slice(0, 24))} aria-label="Preferred name" />
             </div>
             <div className="srow"><div><div className="lab">Appearance</div><div className="sub">Light, dark, or match your device</div></div>
-              <div className="seg">{["light", "dark", "system"].map((t) => (<button key={t} className={theme === t ? "on" : ""} onClick={() => changeTheme(t)}>{t[0].toUpperCase() + t.slice(1)}</button>))}</div>
+              <ThemeSwitch />
             </div>
             <div className="srow"><div><div className="lab">Language</div><div className="sub">Auto replies in whatever language you type</div></div>
               <select className="selbox" value={lang} onChange={(e) => changeLang(e.target.value)}>

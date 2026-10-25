@@ -38,8 +38,8 @@ Cowrie is built first for everyday use in Nigeria. It defaults to naira, underst
 
 ## Watch Cowrie
 
-- [Product tour](web/public/demos/cowrie-product-v1.mp4) — payments, savings and Ajo through conversation.
-- [Ajo and Chainlink CRE](web/public/demos/cowrie-cre-v1.mp4) — a recorded testnet circle, from the draw and automatic contributions to both payouts.
+- [Product tour](https://cowrie-amber.vercel.app/demo#product-demo): payments, savings and Ajo through conversation.
+- [Ajo and Chainlink CRE](https://cowrie-amber.vercel.app/demo#cre-demo): a recorded testnet circle directly from the terminal, displaying the draw and automatic contributions to both payouts.
 
 Both videos are available on the app's `/demo` page. The CRE walkthrough uses test cUSD and CRE simulation with broadcast. Its transaction evidence is in [the verification record](docs/demos/cre-verification.json).
 

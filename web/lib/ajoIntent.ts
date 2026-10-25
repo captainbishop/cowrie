@@ -29,6 +29,8 @@ const ORDER: AjoStep["kind"][] = ["pay", "join", "settle", "withdraw", "move"];
 function parseCore(text: string): AjoPlan | null {
   const t = text.toLowerCase();
   if (/0x[a-f0-9]{8,}/.test(t)) return null;
+  // Let the conversational parser distinguish a walkthrough from a wallet action.
+  if (/\b(demo|video|walkthrough)\b/.test(t)) return null;
   const st = getAjoState();
   const nowSec = Math.floor(Date.now() / 1000);
   const mine = st.circles.filter((c) => c.isMember);

@@ -301,3 +301,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .demoentry-settings { color:var(--text); text-decoration:none; border-radius:10px; min-height:60px; }
 .demoentry-settings .lab,.demoentry-settings .sub { display:block; }
 .demoentry-settings:hover { background:var(--surface-2); }
+
+.theme-switch button { min-height:44px; transition:background-color .12s,color .12s; }
+.theme-switch button:hover:not(.on) { background:var(--brand-soft); color:var(--brand-soft-ink); }
+.theme-switch button:focus-visible { outline:2px solid var(--brand-soft-ink); outline-offset:-3px; }
+@media(prefers-reduced-motion:reduce) { .theme-switch button { transition:none; } }
