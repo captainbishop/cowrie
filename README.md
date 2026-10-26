@@ -38,10 +38,10 @@ Cowrie is built first for everyday use in Nigeria. It defaults to naira, underst
 
 ## Watch Cowrie
 
-- [Product tour](https://cowrie-amber.vercel.app/demo#product-demo): payments, savings and Ajo through conversation.
-- [Ajo and Chainlink CRE](https://cowrie-amber.vercel.app/demo#cre-demo): a recorded testnet circle directly from the terminal, displaying the draw and automatic contributions to both payouts.
+- [Product tour](https://cowrie-amber.vercel.app/demo#product-demo) (3:04): payments, savings and Ajo through conversation, with English captions.
+- [Ajo and Chainlink CRE](https://cowrie-amber.vercel.app/demo#cre-demo) (2:51): the app and CRE terminal follow a two-member circle through the draw, automatic contributions and both payouts.
 
-Both videos are available on the app's `/demo` page. The CRE walkthrough uses test cUSD and CRE simulation with broadcast. Its transaction evidence is in [the verification record](docs/demos/cre-verification.json).
+Both recordings are published on the [demo page](https://cowrie-amber.vercel.app/demo), with written transcripts and downloads. You can also ask Cowrie to show a product or Ajo walkthrough in chat. The CRE recording uses test cUSD and CRE simulation with broadcast; its transaction evidence is in [the verification record](docs/demos/cre-verification.json).
 
 ## Why Nigeria first
 
@@ -82,7 +82,9 @@ The assistant supports English, Nigerian Pidgin, Igbo, Yoruba, Hausa, French, Sw
 
 Electricity, airtime, data and cable payments have guided flows with provider choices, account or phone details, a final summary and receipts. You can answer in free text, correct an earlier detail or cancel partway through. The [bill flow engine](web/lib/bills.ts) owns the state; the [flow API](web/app/api/flow/route.ts) interprets conversational replies within it. Customer lookups, tariffs, service packages and electricity tokens are simulated. No real biller is contacted.
 
-Saved contacts sync across signed-in sessions through the [contacts API](web/app/api/store/route.ts), with Privy verifying the user's identity and Redis storing their contact book. Chat history stays on the user's device.
+When contact sync is configured, saved contacts sync across signed-in sessions through the [contacts API](web/app/api/store/route.ts), with Privy verifying the user's identity and Redis storing their contact book. Chat history stays in the current browser on the user's device.
+
+Settings controls the display currency, reply language and light, dark or system appearance. The app and demo page use the same saved theme; system mode follows the device's appearance and is the default when no preference is saved.
 
 ## Architecture
 
@@ -100,8 +102,8 @@ Ajo's UI and chat share the [same circle snapshot](web/lib/ajoStore.ts). The ind
 |---|---|---|
 | Web interface | Next.js 14, React 18, TypeScript 5, CSS | [web/app/](web/app/), [web/lib/](web/lib/) |
 | Wallet and EVM client | Privy React SDK, viem | [providers.tsx](web/app/providers.tsx), [CowrieApp.tsx](web/app/CowrieApp.tsx) |
-| AI models | Qwen 3.8 27B (`qwen/qwen3.8-27b`) as primary; Gemini Flash Lite (`gemini-flash-lite-latest`) as secondary fallback | [intent API](web/app/api/parse/route.ts), [bill flow API](web/app/api/flow/route.ts) |
-| Server APIs | Next.js route handlers, Privy Node SDK, OpenAI-compatible model endpoints | [web/app/api/](web/app/api/) |
+| AI models | Configurable primary and fallback models; the setup example uses Qwen 3.8 27B through Groq and Gemini Flash Lite through Google | [intent API](web/app/api/parse/route.ts), [bill flow API](web/app/api/flow/route.ts) |
+| Server APIs | Next.js route handlers, Privy Node SDK, configurable AI endpoints | [web/app/api/](web/app/api/) |
 | Contact storage | Redis REST API with Privy authentication | [store route](web/app/api/store/route.ts) |
 | Smart contracts | Solidity 0.8.28, OpenZeppelin Contracts | [contracts/](contracts/) |
 | Contract tooling | Hardhat 2, ethers, JavaScript, npm | [hardhat.config.js](hardhat.config.js), [scripts/](scripts/), [test/](test/) |
@@ -157,17 +159,18 @@ Privy creates an embedded wallet for users who need one when they sign in with G
 
 ### AI and action handling
 
-The [intent API](web/app/api/parse/route.ts) returns an action and its arguments for the client to handle. It uses conversation context, contacts and wallet state to interpret requests. The current model configuration uses **Qwen 3.8 27B** (`qwen/qwen3.8-27b`) first, through `LLM_*`. If the primary does not return a usable response, the intent route tries **Gemini Flash Lite** (`gemini-flash-lite-latest`) through `LLM2_*`, preserving the same conversation context. The bill flow route also tries the primary before the secondary. If neither provider supplies a usable intent, the general parser uses deterministic rules for core commands; bill replies return to the local flow engine. These model IDs are configurable deployment settings, not hard-coded credentials.
+The [intent API](web/app/api/parse/route.ts) returns an action and its arguments for the client to handle. It uses conversation context, contacts and wallet state to interpret requests. The primary provider is configured through `LLM_*`, with an optional fallback through `LLM2_*`. The [setup example](web/.env.local.example) uses Qwen 3.8 27B (`qwen/qwen3.8-27b`) through Groq and Gemini Flash Lite (`gemini-flash-lite-latest`) through Google. If the primary does not return a usable response, the intent route tries the fallback with the same conversation context. The bill flow route also tries the primary before the secondary. If neither provider supplies a usable intent, the general parser uses deterministic rules for core commands; bill replies return to the local flow engine. The endpoint URLs, model IDs and API keys are deployment settings. Set them for the providers you use.
 
 ```text
 User message + conversation and wallet context
-  -> Qwen 3.8 27B (primary)
-  -> Gemini Flash Lite (fallback when the primary cannot answer)
-  -> deterministic core-command / bill-flow handling if AI is unavailable
-  -> review and wallet confirmation before a transaction
+  -> primary AI provider
+     -> usable response: show a reply or prepare an action
+     -> unavailable: try the configured fallback provider
+        -> still unavailable: use core-command rules or the bill-flow engine
+  -> proposed transactions go through review and wallet confirmation
 ```
 
-The [Ajo intent layer](web/lib/ajoIntent.ts) resolves circle commands against current state before the general parser. The [Ajo agent](web/app/AjoAgent.tsx) builds confirmation plans and reports transaction results. Bill replies pass through their own state machine, so changing a network or meter detail does not require starting the whole payment again. Money movement is handled by the transaction executor, and confirmation text is tied to its result.
+The [Ajo intent layer](web/lib/ajoIntent.ts) resolves circle commands against current state before the general parser. Messages mentioning a demo, video or walkthrough go to the conversational parser so a request to watch Ajo can open the video. The [Ajo agent](web/app/AjoAgent.tsx) builds confirmation plans and reports transaction results. Bill replies pass through their own state machine, so changing a network or meter detail does not require starting the whole payment again. Money movement is handled by the transaction executor, and confirmation text is tied to its result.
 
 ### Chainlink price feeds and CRE
 
@@ -230,7 +233,7 @@ cd cowrie
    npm install
    ```
 
-2. Create `web/.env.local` if it does not already exist. Start from [.env.local.example](web/.env.local.example), then set the following values. Keep existing credentials if the file is already configured.
+2. Inside `web/`, create `.env.local` if it does not already exist. Start from [.env.local.example](web/.env.local.example), then set the following values. Keep existing credentials if the file is already configured.
 
    ```dotenv
    NEXT_PUBLIC_PRIVY_APP_ID=your-privy-app-id
@@ -245,15 +248,22 @@ cd cowrie
 
    Create an app in the [Privy dashboard](https://dashboard.privy.io) and configure its login methods, local origin and gas sponsorship for Monad testnet. The app reads mainnet prices separately from testnet balances. Optional RPC overrides are `NEXT_PUBLIC_MONAD_RPC` and `NEXT_PUBLIC_MONAD_MAINNET_RPC`.
 
-3. For conversational AI, add an OpenAI-compatible provider to the same file:
+3. Configure your AI provider in the same file. This example uses Qwen through Groq, with Gemini through Google as an optional fallback:
 
    ```dotenv
-   LLM_BASE_URL=https://your-provider.example/v1
-   LLM_API_KEY=your-server-side-key
-   LLM_MODEL=your-provider-model-id
+   LLM_BASE_URL=https://api.groq.com/openai/v1
+   LLM_API_KEY=your-groq-api-key
+   LLM_MODEL=qwen/qwen3.8-27b
+
+   # Optional fallback: configure all three values to enable it.
+   LLM2_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+   LLM2_API_KEY=your-google-api-key
+   LLM2_MODEL=gemini-flash-lite-latest
    ```
 
-   Optional fallback settings are `LLM2_BASE_URL`, `LLM2_API_KEY` and `LLM2_MODEL`. Keep these keys server-side, without a `NEXT_PUBLIC_` prefix. Without an AI provider, the rules parser handles core commands with more limited language support.
+   Other providers can be used if their endpoint accepts `POST /chat/completions` with `model` and `messages` and returns the reply in `choices[0].message.content`, as the [intent route](web/app/api/parse/route.ts) and [bill flow route](web/app/api/flow/route.ts) expect. The base URL should exclude `/chat/completions` and have no trailing slash.
+
+   Keep API keys server-side, without a `NEXT_PUBLIC_` prefix. Without an AI provider, core commands and local bill flows have more limited language support. The published videos still play, but conversational requests to show them need AI.
 
    To enable the same contact sync in your own deployment, set `PRIVY_APP_SECRET` and either `KV_REST_API_URL` / `KV_REST_API_TOKEN` or `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`.
 
@@ -264,6 +274,16 @@ cd cowrie
    ```
 
    Open [localhost:3000](http://localhost:3000). For a production build, run `npm run build`, then `npm start` from the same directory.
+
+### Check theme and demo behavior
+
+After installing the web dependencies, run this from the repository root:
+
+```sh
+node scripts/test-demo.cjs
+```
+
+These checks cover theme preferences, device-theme changes and demo routing. They use simulated AI responses and do not call a live model or send transactions.
 
 ## Compile, test and deploy contracts
 
@@ -292,7 +312,7 @@ The following steps send transactions to Monad testnet and replace the addresses
    npm run syncenv
    ```
 
-   `deploy.js` replaces `deployments.json`; `deploy-v2.js` adds the V2 circle and keeper and authorises the keeper as a drawer. The seed script adds demo funds, pools and markets. Rerunning it skips existing pools and markets but still mints 500 cUSD into the deployer's vault and resets their auto-save to 10%.
+   `deploy.js` replaces `deployments.json`; `deploy-v2.js` adds the V2 circle and keeper and authorises the keeper as a drawer. The seed script mints 500 cUSD into the deployer's vault, flags a sample scam address, sets auto-save to 10% and adds missing token pools. If no prediction markets exist, it also mints 200 cUSD and creates and funds two markets. Rerunning it skips existing pools and markets but repeats the initial top-up, scam flag and auto-save setting.
 
 4. Set `NEXT_PUBLIC_AJO_CIRCLE` to your `AjoCircleV2` address. Update `ajoCircle` and `ajoKeeper` in the [staging](cowrie-cre/my-workflow/config.staging.json) and [production](cowrie-cre/my-workflow/config.production.json) CRE configs. `syncenv` only copies the vault, registry and cUSD addresses; it does not update Ajo or CRE. Restart the frontend after changing its environment.
 
@@ -327,11 +347,13 @@ Before those features handle real funds, the test components need production equ
 |---|---|
 | [contracts/](contracts/) | Solidity vault, registry, tokens and both generations of Ajo contracts |
 | [test/](test/) | Hardhat contract tests |
-| [scripts/](scripts/) | Deployment, seeding, environment sync and inspection tools |
+| [scripts/](scripts/) | Deployment, seeding, environment sync, inspection and chat/demo checks |
 | [web/app/](web/app/) | Next.js pages, wallet UI, API routes and styles |
 | [web/lib/](web/lib/) | Chain/contract bindings, bill flows, Ajo intent handling and shared circle reads |
+| [web/app/demo/](web/app/demo/) | Demo page and written walkthrough transcripts |
+| [web/public/demos/](web/public/demos/) | Published MP4 recordings and poster images |
 | [cowrie-cre/](cowrie-cre/) | CRE project, TypeScript workflow, generated bindings and configs |
-| [docs/](docs/) | Architecture diagrams, banner and external-code attribution |
+| [docs/](docs/) | Architecture diagrams, banner, external-code attribution and CRE demo verification |
 | [deployments.json](deployments.json) | Recorded testnet addresses |
 
 ## Origins and development
@@ -341,8 +363,6 @@ Cowrie was initially developed for **Monad Metropolis** and is growing beyond th
 The [repository](https://github.com/captainbishop/cowrie) contains the frontend, server routes, contracts, CRE workflow, generated bindings, deployment scripts and tests. Its [commit history](https://github.com/captainbishop/cowrie/commits/main/) records that development; locally, use `git log --reverse --date=iso-strict --format="%h %ad %s"` to review it.
 
 The project-specific work includes the conversational wallet and confirmation flows, `PolicyVault` financial rules, guided bill demos, Ajo V2 lifecycle and auto-pay, and the workflow connecting Ajo to Chainlink. [External foundations and libraries](docs/ATTRIBUTIONS.md) are attributed separately.
-
-**Demo video:** in preparation. The three-minute public recording will show the running product and Monad transactions; its link will be added here when published.
 
 ## Contributing and license
 
